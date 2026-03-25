@@ -5,7 +5,6 @@ import 'screens/login_screen.dart';
 import 'screens/dashboard_screen.dart';
 import 'screens/department_view_screen.dart';
 import 'screens/upload_screen.dart';
-import 'screens/document_detail_screen.dart';
 import 'screens/settings_screen.dart';
 import 'screens/signup_screen.dart';
 import 'services/auth_service.dart';
@@ -40,7 +39,6 @@ class AnweshanApp extends StatelessWidget {
           '/dashboard': (context) => const DashboardScreen(),
           '/department': (context) => DepartmentViewScreen(),
           '/upload': (context) => const UploadScreen(),
-          '/detail': (context) => const DocumentDetailScreen(),
           '/settings': (context) => const SettingsScreen(),
         },
       ),

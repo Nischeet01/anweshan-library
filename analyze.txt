@@ -1,0 +1,9 @@
+﻿Analyzing Library app...                                        
+
+   info - Use 'const' with the constructor to improve performance - lib\main.dart:40:39 - prefer_const_constructors
+   info - Use 'const' literals as arguments to constructors of '@immutable' classes - lib\screens\dashboard_screen.dart:35:19 - prefer_const_literals_to_create_immutables
+   info - Use 'const' with the constructor to improve performance - lib\screens\dashboard_screen.dart:37:11 - prefer_const_constructors
+   info - The local variable '_folderNameController' starts with an underscore - lib\screens\dashboard_screen.dart:141:33 - no_leading_underscores_for_local_identifiers
+   info - The local variable '_folderNameController' starts with an underscore - lib\screens\department_view_screen.dart:26:33 - no_leading_underscores_for_local_identifiers
+  error - The method 'is_' isn't defined for the type 'PostgrestFilterBuilder' - lib\services\database_service.dart:101:23 - undefined_method
+

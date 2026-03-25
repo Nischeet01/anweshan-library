@@ -4,8 +4,7 @@ import 'package:flutter/foundation.dart';
 class DocumentModel {
   final String id;
   final String title;
-  final String category;
-  final String? categoryId;
+  final String? folderId;
   final String uploadedBy;
   final DateTime uploadDate;
   final String fileUrl;
@@ -13,27 +12,17 @@ class DocumentModel {
   DocumentModel({
     required this.id,
     required this.title,
-    required this.category,
-    this.categoryId,
+    this.folderId,
     required this.uploadedBy,
     required this.uploadDate,
     required this.fileUrl,
   });
 
   factory DocumentModel.fromMap(Map<String, dynamic> data) {
-    // Handle joined category data — may come as nested object or flat string
-    String categoryName = '';
-    if (data['categories'] != null && data['categories'] is Map) {
-      categoryName = data['categories']['name'] ?? '';
-    } else {
-      categoryName = data['category'] ?? '';
-    }
-
     return DocumentModel(
       id: data['id']?.toString() ?? '',
       title: data['title'] ?? '',
-      category: categoryName,
-      categoryId: data['category_id']?.toString(),
+      folderId: data['folder_id']?.toString(),
       uploadedBy: data['uploaded_by']?.toString() ?? '',
       uploadDate: data['created_at'] != null
           ? DateTime.parse(data['created_at'])
@@ -45,23 +34,25 @@ class DocumentModel {
   Map<String, dynamic> toMap() {
     return {
       'title': title,
-      'category_id': categoryId,
+      'folder_id': folderId,
       'uploaded_by': uploadedBy,
       'file_url': fileUrl,
     };
   }
 }
 
-class CategoryModel {
+class FolderModel {
   final String id;
   final String name;
+  final String? parentId;
 
-  CategoryModel({required this.id, required this.name});
+  FolderModel({required this.id, required this.name, this.parentId});
 
-  factory CategoryModel.fromMap(Map<String, dynamic> data) {
-    return CategoryModel(
+  factory FolderModel.fromMap(Map<String, dynamic> data) {
+    return FolderModel(
       id: data['id']?.toString() ?? '',
       name: data['name'] ?? '',
+      parentId: data['parent_id']?.toString(),
     );
   }
 }
@@ -73,7 +64,7 @@ class DatabaseService {
   Future<List<DocumentModel>> getDocuments() async {
     final response = await _supabase
         .from('documents')
-        .select('*, categories(name)')
+        .select('*')
         .order('created_at', ascending: false);
 
     return (response as List).map((row) => DocumentModel.fromMap(row)).toList();
@@ -88,14 +79,68 @@ class DatabaseService {
         .map((data) => data.map((map) => DocumentModel.fromMap(map)).toList());
   }
 
-  /// Stream of documents filtered by category name.
-  Stream<List<DocumentModel>> getDocumentsByCategory(String category) {
-    return _supabase
-        .from('documents')
-        .stream(primaryKey: ['id'])
-        .eq('category', category)
-        .order('created_at')
-        .map((data) => data.map((map) => DocumentModel.fromMap(map)).toList());
+  /// Stream of documents filtered by folder.
+  Stream<List<DocumentModel>> getDocumentsByFolder(String? folderId) {
+    if (folderId == null) {
+      return _supabase.from('documents').stream(primaryKey: ['id']).order('created_at')
+          .map((data) => data
+          .where((map) => map['folder_id'] == null)
+          .map((map) => DocumentModel.fromMap(map))
+          .toList());
+    } else {
+      return _supabase.from('documents').stream(primaryKey: ['id']).eq('folder_id', folderId).order('created_at')
+          .map((data) => data.map((map) => DocumentModel.fromMap(map)).toList());
+    }
+  }
+
+  /// Fetch folders based on parentId
+  Future<List<FolderModel>> getFolders(String? parentId) async {
+    try {
+      var query = _supabase.from('folders').select('*');
+      if (parentId == null) {
+        query = query.isFilter('parent_id', null);
+      } else {
+        query = query.eq('parent_id', parentId);
+      }
+      final response = await query.order('name');
+      return (response as List).map((row) => FolderModel.fromMap(row)).toList();
+    } catch (e) {
+      debugPrint('Fetch Error: $e');
+      return [];
+    }
+  }
+
+  /// Fetch all folders for dropdowns
+  Future<List<FolderModel>> getAllFolders() async {
+    try {
+      final response = await _supabase.from('folders').select('*').order('name');
+      return (response as List).map((row) => FolderModel.fromMap(row)).toList();
+    } catch (e) {
+      debugPrint('Fetch Error: $e');
+      return [];
+    }
+  }
+
+  /// Stream of folders filtered by parentId
+  Stream<List<FolderModel>> streamFolders(String? parentId) {
+    if (parentId == null) {
+      return _supabase.from('folders').stream(primaryKey: ['id']).order('name')
+          .map((data) => data
+          .where((map) => map['parent_id'] == null)
+          .map((map) => FolderModel.fromMap(map))
+          .toList());
+    } else {
+      return _supabase.from('folders').stream(primaryKey: ['id']).eq('parent_id', parentId).order('name')
+          .map((data) => data.map((map) => FolderModel.fromMap(map)).toList());
+    }
+  }
+
+  /// Create a new folder
+  Future<void> createFolder(String name, String? parentId) async {
+    await _supabase.from('folders').insert({
+      'name': name,
+      'parent_id': parentId,
+    });
   }
 
   /// Save a new document record.
@@ -103,20 +148,6 @@ class DatabaseService {
     final data = doc.toMap();
     data.remove('id'); // Ensure the database auto-generates the UUID
     await _supabase.from('documents').insert(data);
-  }
-
-  /// Fetch category objects (id + name) from the categories table.
-  Future<List<CategoryModel>> getCategories() async {
-    try {
-      final response =
-          await _supabase.from('categories').select('id, name').order('name');
-      return (response as List)
-          .map((row) => CategoryModel.fromMap(row))
-          .toList();
-    } catch (e) {
-      debugPrint('Fetch Error: $e');
-      return [];
-    }
   }
 
   /// User profile helper.
@@ -131,5 +162,18 @@ class DatabaseService {
   /// Delete a document record.
   Future<void> deleteDocument(String id) async {
     await _supabase.from('documents').delete().eq('id', id);
+  }
+
+  /// Search documents by title (case-insensitive).
+  Future<List<DocumentModel>> searchDocuments(String query) async {
+    if (query.isEmpty) return [];
+    
+    final response = await _supabase
+        .from('documents')
+        .select('*')
+        .ilike('title', '%$query%')
+        .order('created_at', ascending: false);
+
+    return (response as List).map((row) => DocumentModel.fromMap(row)).toList();
   }
 }

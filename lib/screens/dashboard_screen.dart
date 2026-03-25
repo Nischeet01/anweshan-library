@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
+import 'dart:async';
 import '../theme.dart';
 import '../services/database_service.dart';
+import '../services/auth_service.dart';
 import 'department_view_screen.dart';
 import 'settings_screen.dart';
+import 'document_detail_screen.dart';
+import 'package:provider/provider.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -13,6 +17,7 @@ class DashboardScreen extends StatefulWidget {
 
 class _DashboardScreenState extends State<DashboardScreen> {
   int _selectedIndex = 0;
+  final DatabaseService _databaseService = DatabaseService();
 
   void _onItemTapped(int index) {
     setState(() {
@@ -20,29 +25,100 @@ class _DashboardScreenState extends State<DashboardScreen> {
     });
   }
 
+  void _showAddOptions(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (BuildContext bc) {
+        return SafeArea(
+          child: Wrap(
+            children: <Widget>[
+              ListTile(
+                leading: const Icon(Icons.description, color: AnweshanTheme.primaryDeep),
+                title: const Text('Upload Document'),
+                onTap: () async {
+                  Navigator.pop(context);
+                  await Navigator.pushNamed(context, '/upload');
+                  if (_selectedIndex == 0) setState(() {});
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.create_new_folder, color: AnweshanTheme.primaryDeep),
+                title: const Text('Create Folder'),
+                onTap: () {
+                  Navigator.pop(context);
+                  _showCreateRootFolderDialog(context);
+                },
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  void _showCreateRootFolderDialog(BuildContext context) {
+    final TextEditingController folderNameController = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text('Create Folder'),
+          content: TextField(
+            controller: folderNameController,
+            decoration: const InputDecoration(hintText: 'Folder Name'),
+            autofocus: true,
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                final name = folderNameController.text.trim();
+                if (name.isNotEmpty) {
+                  await _databaseService.createFolder(name, null);
+                  if (context.mounted) {
+                    Navigator.pop(dialogContext);
+                    setState(() {}); // refresh folders
+                  }
+                }
+              },
+              child: const Text('Create'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    final isAdmin = context.watch<AuthService>().isAdmin;
+
     return Scaffold(
       body: IndexedStack(
         index: _selectedIndex,
         children: [
           const _DashboardContent(),
-          DepartmentViewScreen(),
-          const _SearchPlaceholder(),
+          DepartmentViewScreen(), // Kept the class name, but it will be updated
+          const SearchScreen(),
           const SettingsScreen(),
         ],
       ),
       bottomNavigationBar: _buildBottomNav(context),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () async {
-          await Navigator.pushNamed(context, '/upload');
-          // Refresh dashboard when returning from upload
-          if (_selectedIndex == 0) setState(() {});
-        },
-        backgroundColor: AnweshanTheme.primaryDeep,
-        shape: const CircleBorder(),
-        child: const Icon(Icons.add, color: Colors.white),
-      ),
+      floatingActionButton: isAdmin
+          ? FloatingActionButton(
+              heroTag: 'dashboard_add_fab',
+              onPressed: () => _showAddOptions(context),
+              backgroundColor: AnweshanTheme.primaryDeep,
+              shape: const CircleBorder(),
+              child: const Icon(Icons.add, color: Colors.white),
+            )
+          : null,
       floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
     );
   }
@@ -99,9 +175,76 @@ class _DashboardContent extends StatefulWidget {
 class _DashboardContentState extends State<_DashboardContent> {
   final DatabaseService _databaseService = DatabaseService();
   final TextEditingController _searchController = TextEditingController();
+  List<DocumentModel>? _searchResults;
+  bool _isSearching = false;
+  Timer? _debounce;
+
+  void _onSearchChanged(String query) {
+    if (_debounce?.isActive ?? false) _debounce!.cancel();
+    
+    if (query.isEmpty) {
+      setState(() {
+        _isSearching = false;
+        _searchResults = null;
+      });
+      return;
+    }
+
+    setState(() {
+      _isSearching = true;
+      _searchResults = null; 
+    });
+
+    _debounce = Timer(const Duration(milliseconds: 500), () async {
+      final results = await _databaseService.searchDocuments(query);
+      if (mounted) {
+        setState(() {
+          _searchResults = results;
+        });
+      }
+    });
+  }
+
+  void _showCreateFolderDialog(BuildContext context) {
+    final TextEditingController folderNameController = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text('Create Folder'),
+          content: TextField(
+            controller: folderNameController,
+            decoration: const InputDecoration(hintText: 'Folder Name'),
+            autofocus: true,
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                final name = folderNameController.text.trim();
+                if (name.isNotEmpty) {
+                  await _databaseService.createFolder(name, null);
+                  if (context.mounted) {
+                    Navigator.pop(dialogContext);
+                    setState(() {}); // refresh folders
+                  }
+                }
+              },
+              child: const Text('Create'),
+            ),
+          ],
+        );
+      },
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
+    final isAdmin = Provider.of<AuthService>(context).isAdmin;
+
     return SafeArea(
       child: SingleChildScrollView(
         padding: const EdgeInsets.symmetric(horizontal: 24.0),
@@ -109,51 +252,56 @@ class _DashboardContentState extends State<_DashboardContent> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const SizedBox(height: 24),
-            _buildHeader(context),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Anweshan Hub',
+                      style: Theme.of(context).textTheme.headlineMedium,
+                    ),
+                    Text(
+                      'Welcome back',
+                      style: Theme.of(context).textTheme.labelLarge,
+                    ),
+                  ],
+                ),
+                if (isAdmin)
+                  IconButton(
+                    icon: const Icon(Icons.create_new_folder, color: AnweshanTheme.primaryDeep),
+                    onPressed: () => _showCreateFolderDialog(context),
+                  )
+                else
+                  CircleAvatar(
+                    backgroundColor: AnweshanTheme.primaryDeep.withValues(alpha: 0.1),
+                    child: const Icon(Icons.person_outline,
+                        color: AnweshanTheme.primaryDeep),
+                  ),
+              ],
+            ),
             const SizedBox(height: 32),
             _buildSearchBar(context),
-            const SizedBox(height: 40),
-            _buildSectionHeader(context, 'Latest Documents', true),
-            const SizedBox(height: 16),
-            _buildLatestDocuments(context),
-            const SizedBox(height: 40),
-            _buildSectionHeader(context, 'Categories', false),
-            const SizedBox(height: 16),
-            _buildCategoriesGrid(context),
-            const SizedBox(height: 40),
-            _buildSectionHeader(context, 'Recent Activity', true),
-            const SizedBox(height: 16),
-            _buildRecentActivityList(context),
-            const SizedBox(height: 100), // Space for bottom nav
+            if (_isSearching) ...[
+              const SizedBox(height: 40),
+              _buildSectionHeader(context, 'Search Results', false),
+              const SizedBox(height: 16),
+              _buildSearchResultsList(context),
+            ] else ...[
+              const SizedBox(height: 40),
+              _buildSectionHeader(context, 'Root Folders', false),
+              const SizedBox(height: 16),
+              _buildFoldersGrid(context),
+              const SizedBox(height: 40),
+              _buildSectionHeader(context, 'Root Documents', true),
+              const SizedBox(height: 16),
+              _buildRootDocuments(context),
+            ],
+            const SizedBox(height: 100), 
           ],
         ),
       ),
-    );
-  }
-
-  Widget _buildHeader(BuildContext context) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Anweshan Hub',
-              style: Theme.of(context).textTheme.headlineMedium,
-            ),
-            Text(
-              'Welcome back, Researcher',
-              style: Theme.of(context).textTheme.labelLarge,
-            ),
-          ],
-        ),
-        CircleAvatar(
-          backgroundColor: AnweshanTheme.primaryDeep.withValues(alpha: 0.1),
-          child: const Icon(Icons.person_outline,
-              color: AnweshanTheme.primaryDeep),
-        ),
-      ],
     );
   }
 
@@ -166,6 +314,7 @@ class _DashboardContentState extends State<_DashboardContent> {
       padding: const EdgeInsets.symmetric(horizontal: 20),
       child: TextField(
         controller: _searchController,
+        onChanged: _onSearchChanged,
         decoration: InputDecoration(
           icon: const Icon(Icons.search, color: AnweshanTheme.onSurfaceVariant),
           hintText: 'Search documents...',
@@ -174,6 +323,84 @@ class _DashboardContentState extends State<_DashboardContent> {
               ),
           border: InputBorder.none,
           filled: false,
+          suffixIcon: _isSearching
+              ? IconButton(
+                  icon: const Icon(Icons.clear, size: 20),
+                  onPressed: () {
+                    _searchController.clear();
+                    _onSearchChanged('');
+                  },
+                )
+              : null,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSearchResultsList(BuildContext context) {
+    if (_searchResults == null) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    if (_searchResults!.isEmpty) {
+      return _buildEmptyState();
+    }
+
+    return ListView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      itemCount: _searchResults!.length,
+      itemBuilder: (context, index) {
+        final doc = _searchResults![index];
+        return _buildDocListItem(context, doc);
+      },
+    );
+  }
+
+  Widget _buildDocListItem(BuildContext context, DocumentModel doc) {
+    return InkWell(
+      onTap: () => Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => DocumentDetailScreen(document: doc),
+        ),
+      ),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: Colors.black.withValues(alpha: 0.05)),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 48,
+              height: 48,
+              decoration: BoxDecoration(
+                color: AnweshanTheme.secondaryGold.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Icon(Icons.description,
+                  color: AnweshanTheme.accentGoldDim),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(doc.title,
+                      style: const TextStyle(fontWeight: FontWeight.bold)),
+                  Text(
+                    '${doc.uploadedBy.isNotEmpty ? doc.uploadedBy : 'Admin'} • ${doc.uploadDate.day}/${doc.uploadDate.month}',
+                    style: Theme.of(context).textTheme.labelLarge,
+                  ),
+                ],
+              ),
+            ),
+            const Icon(Icons.chevron_right, color: AnweshanTheme.onSurfaceVariant),
+          ],
         ),
       ),
     );
@@ -199,11 +426,11 @@ class _DashboardContentState extends State<_DashboardContent> {
     );
   }
 
-  Widget _buildLatestDocuments(BuildContext context) {
+  Widget _buildRootDocuments(BuildContext context) {
     return SizedBox(
       height: 200,
       child: StreamBuilder<List<DocumentModel>>(
-        stream: _databaseService.getLatestDocuments(),
+        stream: _databaseService.getDocumentsByFolder(null),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
@@ -225,8 +452,12 @@ class _DashboardContentState extends State<_DashboardContent> {
             itemBuilder: (context, index) {
               final doc = docs[index];
               return InkWell(
-                onTap: () =>
-                    Navigator.pushNamed(context, '/detail', arguments: doc),
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => DocumentDetailScreen(document: doc),
+                  ),
+                ),
                 child: Container(
                   width: 160,
                   margin: const EdgeInsets.only(right: 16),
@@ -249,7 +480,7 @@ class _DashboardContentState extends State<_DashboardContent> {
                           ),
                           const SizedBox(height: 4),
                           Text(
-                              doc.category.isNotEmpty ? doc.category : 'Document',
+                              'Document', // Root document
                               style: Theme.of(context).textTheme.labelLarge),
                         ],
                       ),
@@ -293,20 +524,20 @@ class _DashboardContentState extends State<_DashboardContent> {
     );
   }
 
-  Widget _buildCategoriesGrid(BuildContext context) {
-    return FutureBuilder<List<CategoryModel>>(
-      future: _databaseService.getCategories(),
+  Widget _buildFoldersGrid(BuildContext context) {
+    return StreamBuilder<List<FolderModel>>(
+      stream: _databaseService.streamFolders(null),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(child: CircularProgressIndicator());
         }
         if (snapshot.hasError) {
-          return const Text('Could not load categories.',
+          return const Text('Could not load folders.',
               style: TextStyle(color: Colors.red));
         }
-        final categories = snapshot.data ?? [];
-        if (categories.isEmpty) {
-          return const Text('No categories available.',
+        final folders = snapshot.data ?? [];
+        if (folders.isEmpty) {
+          return const Text('No folders available.',
               style: TextStyle(color: AnweshanTheme.onSurfaceVariant));
         }
         return GridView.builder(
@@ -318,12 +549,19 @@ class _DashboardContentState extends State<_DashboardContent> {
             crossAxisSpacing: 12,
             childAspectRatio: 2.5,
           ),
-          itemCount: categories.length,
+          itemCount: folders.length,
           itemBuilder: (context, index) {
-            final category = categories[index];
+            final folder = folders[index];
             return InkWell(
-              onTap: () => Navigator.pushNamed(context, '/department',
-                  arguments: category.name),
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => DepartmentViewScreen(
+                    folderId: folder.id,
+                    folderName: folder.name,
+                  ),
+                ),
+              ),
               child: Container(
                 decoration: BoxDecoration(
                   color: AnweshanTheme.primaryDeep.withValues(alpha: 0.05),
@@ -331,108 +569,19 @@ class _DashboardContentState extends State<_DashboardContent> {
                       BorderRadius.circular(AnweshanTheme.pillRadius),
                 ),
                 alignment: Alignment.center,
-                child: Text(
-                  category.name,
-                  style: const TextStyle(
-                      fontWeight: FontWeight.w600, fontSize: 13),
-                ),
-              ),
-            );
-          },
-        );
-      },
-    );
-  }
-
-  Widget _buildRecentActivityList(BuildContext context) {
-    return FutureBuilder<List<DocumentModel>>(
-      future: _databaseService.getDocuments(),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(
-            child: Padding(
-              padding: EdgeInsets.all(24.0),
-              child: CircularProgressIndicator(),
-            ),
-          );
-        }
-        if (snapshot.hasError) {
-          return const Text('Could not load recent activity.',
-              style: TextStyle(color: Colors.red));
-        }
-        final docs = snapshot.data ?? [];
-        if (docs.isEmpty) {
-          return Container(
-            padding: const EdgeInsets.all(24),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: Colors.black.withValues(alpha: 0.05)),
-            ),
-            child: Center(
-              child: Column(
-                children: [
-                  Icon(Icons.history,
-                      size: 40,
-                      color: AnweshanTheme.onSurfaceVariant.withValues(alpha: 0.3)),
-                  const SizedBox(height: 8),
-                  const Text(
-                    'No recent activity yet.',
-                    style: TextStyle(color: AnweshanTheme.onSurfaceVariant),
-                  ),
-                ],
-              ),
-            ),
-          );
-        }
-        // Show at most 5 recent items
-        final recentDocs = docs.take(5).toList();
-        return ListView.builder(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          itemCount: recentDocs.length,
-          itemBuilder: (context, index) {
-            final doc = recentDocs[index];
-            return InkWell(
-              onTap: () =>
-                  Navigator.pushNamed(context, '/detail', arguments: doc),
-              child: Container(
-                margin: const EdgeInsets.only(bottom: 12),
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: Colors.black.withValues(alpha: 0.05)),
-                ),
                 child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Container(
-                      width: 48,
-                      height: 48,
-                      decoration: BoxDecoration(
-                        color: AnweshanTheme.secondaryGold.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: const Icon(Icons.description,
-                          color: AnweshanTheme.accentGoldDim),
-                    ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(doc.title,
-                              style:
-                                  const TextStyle(fontWeight: FontWeight.bold)),
-                          Text(
-                            '${doc.uploadedBy.isNotEmpty ? doc.uploadedBy : 'Admin'} • ${doc.uploadDate.day}/${doc.uploadDate.month}',
-                            style: Theme.of(context).textTheme.labelLarge,
-                          ),
-                        ],
+                    const Icon(Icons.folder, color: AnweshanTheme.primaryDeep, size: 16),
+                    const SizedBox(width: 4),
+                    Flexible(
+                      child: Text(
+                        folder.name,
+                        style: const TextStyle(
+                            fontWeight: FontWeight.w600, fontSize: 13),
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ),
-                    const Icon(Icons.more_vert,
-                        color: AnweshanTheme.onSurfaceVariant),
                   ],
                 ),
               ),
@@ -446,20 +595,198 @@ class _DashboardContentState extends State<_DashboardContent> {
   @override
   void dispose() {
     _searchController.dispose();
+    _debounce?.cancel();
     super.dispose();
   }
 }
 
-class _SearchPlaceholder extends StatelessWidget {
-  const _SearchPlaceholder();
+class SearchScreen extends StatefulWidget {
+  const SearchScreen({super.key});
+
+  @override
+  State<SearchScreen> createState() => _SearchScreenState();
+}
+
+class _SearchScreenState extends State<SearchScreen> {
+  final DatabaseService _databaseService = DatabaseService();
+  final TextEditingController _searchController = TextEditingController();
+  List<DocumentModel>? _searchResults;
+  bool _isLoading = false;
+  Timer? _debounce;
+
+  void _onSearch(String query) {
+    if (_debounce?.isActive ?? false) _debounce!.cancel();
+
+    if (query.isEmpty) {
+      setState(() {
+        _searchResults = null;
+        _isLoading = false;
+      });
+      return;
+    }
+
+    setState(() {
+      _isLoading = true;
+    });
+
+    _debounce = Timer(const Duration(milliseconds: 500), () async {
+      final results = await _databaseService.searchDocuments(query);
+      if (mounted) {
+        setState(() {
+          _searchResults = results;
+          _isLoading = false;
+        });
+      }
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Search')),
-      body: const Center(
-        child: Text('Global Search functionality coming soon!'),
+      backgroundColor: Colors.white,
+      appBar: AppBar(
+        title: const Text('Search', style: TextStyle(color: AnweshanTheme.primaryDeep, fontWeight: FontWeight.bold)),
+        backgroundColor: Colors.white,
+        elevation: 0,
+        centerTitle: true,
+      ),
+      body: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(24.0),
+            child: Container(
+              decoration: BoxDecoration(
+                color: const Color(0xFFEDEEEF),
+                borderRadius: BorderRadius.circular(AnweshanTheme.pillRadius),
+              ),
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: TextField(
+                controller: _searchController,
+                onChanged: _onSearch,
+                autofocus: true,
+                decoration: InputDecoration(
+                  icon: const Icon(Icons.search, color: AnweshanTheme.onSurfaceVariant),
+                  hintText: 'Search by title...',
+                  border: InputBorder.none,
+                  suffixIcon: _searchController.text.isNotEmpty
+                      ? IconButton(
+                          icon: const Icon(Icons.clear, size: 20),
+                          onPressed: () {
+                            _searchController.clear();
+                            _onSearch('');
+                          },
+                        )
+                      : null,
+                ),
+              ),
+            ),
+          ),
+          Expanded(
+            child: _buildBody(),
+          ),
+        ],
       ),
     );
+  }
+
+  Widget _buildBody() {
+    if (_isLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    if (_searchResults == null) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.search, size: 80, color: AnweshanTheme.primaryDeep.withValues(alpha: 0.1)),
+            const SizedBox(height: 16),
+            const Text(
+              'Enter a title to search',
+              style: TextStyle(color: AnweshanTheme.onSurfaceVariant, fontSize: 16),
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (_searchResults!.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.search_off, size: 80, color: AnweshanTheme.primaryDeep.withValues(alpha: 0.1)),
+            const SizedBox(height: 16),
+            const Text(
+              'No documents matched your search',
+              style: TextStyle(color: AnweshanTheme.onSurfaceVariant, fontSize: 16),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return ListView.builder(
+      padding: const EdgeInsets.symmetric(horizontal: 24),
+      itemCount: _searchResults!.length,
+      itemBuilder: (context, index) {
+        final doc = _searchResults![index];
+        return _buildDocListItem(context, doc);
+      },
+    );
+  }
+
+  Widget _buildDocListItem(BuildContext context, DocumentModel doc) {
+    return InkWell(
+      onTap: () => Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => DocumentDetailScreen(document: doc),
+        ),
+      ),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: Colors.black.withValues(alpha: 0.05)),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 48,
+              height: 48,
+              decoration: BoxDecoration(
+                color: AnweshanTheme.secondaryGold.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Icon(Icons.description, color: AnweshanTheme.accentGoldDim),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(doc.title, style: const TextStyle(fontWeight: FontWeight.bold)),
+                  Text(
+                    '${doc.uploadedBy.isNotEmpty ? doc.uploadedBy : 'Admin'} • ${doc.uploadDate.day}/${doc.uploadDate.month}',
+                    style: Theme.of(context).textTheme.labelLarge,
+                  ),
+                ],
+              ),
+            ),
+            const Icon(Icons.chevron_right, color: AnweshanTheme.onSurfaceVariant),
+          ],
+        ),
+      ),
+    );
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    _debounce?.cancel();
+    super.dispose();
   }
 }

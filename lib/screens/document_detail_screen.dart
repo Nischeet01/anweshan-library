@@ -3,24 +3,20 @@ import 'package:intl/intl.dart';
 import '../theme.dart';
 import '../services/database_service.dart';
 import '../services/storage_service.dart';
+import 'package:syncfusion_flutter_pdfviewer/pdfviewer.dart';
 
 class DocumentDetailScreen extends StatelessWidget {
-  const DocumentDetailScreen({super.key});
+  final DocumentModel document;
+  const DocumentDetailScreen({super.key, required this.document});
 
   @override
   Widget build(BuildContext context) {
-    final DocumentModel? doc = ModalRoute.of(context)?.settings.arguments as DocumentModel?;
-
-    if (doc == null) {
-      return Scaffold(
-        appBar: AppBar(title: const Text('Error')),
-        body: const Center(child: Text('No document data found.')),
-      );
-    }
+    final doc = document;
 
     final StorageService storageService = StorageService();
     final DatabaseService databaseService = DatabaseService();
-    final String formattedDate = DateFormat('MMM dd, yyyy').format(doc.uploadDate);
+    final String formattedDate =
+        DateFormat('MMM dd, yyyy').format(doc.uploadDate);
 
     return Scaffold(
       appBar: AppBar(
@@ -52,6 +48,34 @@ class DocumentDetailScreen extends StatelessWidget {
   }
 
   Widget _buildFilePreview(BuildContext context, DocumentModel doc) {
+    final String fileUrl = doc.fileUrl;
+    final String ext = fileUrl.split('?').first.split('.').last.toLowerCase();
+
+    if (['jpg', 'jpeg', 'png'].contains(ext)) {
+      return Container(
+        width: double.infinity,
+        height: 300,
+        decoration: BoxDecoration(
+          color: const Color(0xFFEDEEEF),
+          borderRadius: BorderRadius.circular(24),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: Image.network(fileUrl, fit: BoxFit.contain),
+      );
+    } else if (ext == 'pdf') {
+      return Container(
+        width: double.infinity,
+        height: 400,
+        decoration: BoxDecoration(
+          color: const Color(0xFFEDEEEF),
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: AnweshanTheme.outline.withValues(alpha: 0.2)),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: SfPdfViewer.network(fileUrl),
+      );
+    }
+
     return Container(
       width: double.infinity,
       height: 300,
@@ -65,26 +89,30 @@ class DocumentDetailScreen extends StatelessWidget {
           const Icon(Icons.description, size: 80, color: AnweshanTheme.outline),
           const SizedBox(height: 16),
           Text(
-            doc.title.split('.').last.toUpperCase(),
+            ext.toUpperCase(),
             style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-              color: AnweshanTheme.onSurfaceVariant.withValues(alpha: 0.5),
-            ),
+                  color: AnweshanTheme.onSurfaceVariant.withValues(alpha: 0.5),
+                ),
           ),
           const SizedBox(height: 8),
-          Text('Preview Unavailable', style: Theme.of(context).textTheme.labelLarge),
+          Text('Preview Unavailable',
+              style: Theme.of(context).textTheme.labelLarge),
         ],
       ),
     );
   }
 
-  Widget _buildMetadataTable(BuildContext context, DocumentModel doc, String date) {
+  Widget _buildMetadataTable(
+      BuildContext context, DocumentModel doc, String date) {
     return Column(
       children: [
-        _buildMetadataRow('Uploaded By', doc.uploadedBy.isEmpty ? 'Admin' : doc.uploadedBy),
+        _buildMetadataRow(
+            'Uploaded By', doc.uploadedBy.isEmpty ? 'Admin' : doc.uploadedBy),
         const Divider(),
         _buildMetadataRow('Date', date),
         const Divider(),
-        _buildMetadataRow('Category', doc.category.isEmpty ? 'Uncategorized' : doc.category),
+        _buildMetadataRow(
+            'Folder', doc.folderId == null ? 'Root' : doc.folderId!),
       ],
     );
   }
@@ -95,14 +123,15 @@ class DocumentDetailScreen extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: const TextStyle(color: AnweshanTheme.onSurfaceVariant)),
+          Text(label,
+              style: const TextStyle(color: AnweshanTheme.onSurfaceVariant)),
           Text(value, style: const TextStyle(fontWeight: FontWeight.w600)),
         ],
       ),
     );
   }
 
-  Widget _buildActionButtons(BuildContext context, DocumentModel doc, 
+  Widget _buildActionButtons(BuildContext context, DocumentModel doc,
       StorageService storageService, DatabaseService databaseService) {
     return Row(
       children: [
@@ -139,7 +168,8 @@ class DocumentDetailScreen extends StatelessWidget {
           child: IconButton(
             icon: const Icon(Icons.delete_outline, color: Colors.red),
             onPressed: () {
-              _showDeleteConfirmation(context, doc, storageService, databaseService);
+              _showDeleteConfirmation(
+                  context, doc, storageService, databaseService);
             },
           ),
         ),
@@ -147,13 +177,14 @@ class DocumentDetailScreen extends StatelessWidget {
     );
   }
 
-  void _showDeleteConfirmation(BuildContext context, DocumentModel doc, 
+  void _showDeleteConfirmation(BuildContext context, DocumentModel doc,
       StorageService storageService, DatabaseService databaseService) {
     showDialog(
       context: context,
       builder: (dialogContext) => AlertDialog(
         title: const Text('Delete Document'),
-        content: Text('Are you sure you want to delete "${doc.title}"? This action cannot be undone.'),
+        content: Text(
+            'Are you sure you want to delete "${doc.title}"? This action cannot be undone.'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext),
@@ -164,19 +195,20 @@ class DocumentDetailScreen extends StatelessWidget {
               try {
                 // Close dialog first
                 Navigator.pop(dialogContext);
-                
+
                 // 1. Delete from Storage
                 final uri = Uri.parse(doc.fileUrl);
                 final path = uri.pathSegments.last;
                 await storageService.deleteDocument(path);
-                
+
                 // 2. Delete from Database
                 await databaseService.deleteDocument(doc.id);
-                
+
                 if (context.mounted) {
                   Navigator.pop(context); // Go back from detail screen
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Document deleted successfully')),
+                    const SnackBar(
+                        content: Text('Document deleted successfully')),
                   );
                 }
               } catch (e) {
