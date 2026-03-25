@@ -3,6 +3,8 @@ import 'package:intl/intl.dart';
 import '../theme.dart';
 import '../services/database_service.dart';
 import '../services/storage_service.dart';
+import '../services/auth_service.dart';
+import 'package:provider/provider.dart';
 import 'package:syncfusion_flutter_pdfviewer/pdfviewer.dart';
 
 class DocumentDetailScreen extends StatelessWidget {
@@ -60,7 +62,40 @@ class DocumentDetailScreen extends StatelessWidget {
           borderRadius: BorderRadius.circular(24),
         ),
         clipBehavior: Clip.antiAlias,
-        child: Image.network(fileUrl, fit: BoxFit.contain),
+        child: Image.network(
+          fileUrl,
+          fit: BoxFit.contain,
+          errorBuilder: (context, error, stackTrace) {
+            return Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                   const Icon(Icons.broken_image, size: 64, color: Colors.grey),
+                   const SizedBox(height: 8),
+                   Padding(
+                     padding: const EdgeInsets.symmetric(horizontal: 16),
+                     child: Text(
+                       'Image loading failed. This might be a CORS issue on Flutter Web.',
+                       textAlign: TextAlign.center,
+                       style: Theme.of(context).textTheme.bodySmall,
+                     ),
+                   ),
+                ],
+              ),
+            );
+          },
+          loadingBuilder: (context, child, loadingProgress) {
+            if (loadingProgress == null) return child;
+            return Center(
+              child: CircularProgressIndicator(
+                value: loadingProgress.expectedTotalBytes != null
+                    ? loadingProgress.cumulativeBytesLoaded /
+                        loadingProgress.expectedTotalBytes!
+                    : null,
+              ),
+            );
+          },
+        ),
       );
     } else if (ext == 'pdf') {
       return Container(
@@ -69,7 +104,8 @@ class DocumentDetailScreen extends StatelessWidget {
         decoration: BoxDecoration(
           color: const Color(0xFFEDEEEF),
           borderRadius: BorderRadius.circular(24),
-          border: Border.all(color: AnweshanTheme.outline.withValues(alpha: 0.2)),
+          border:
+              Border.all(color: AnweshanTheme.outline.withValues(alpha: 0.2)),
         ),
         clipBehavior: Clip.antiAlias,
         child: SfPdfViewer.network(fileUrl),
@@ -125,7 +161,15 @@ class DocumentDetailScreen extends StatelessWidget {
         children: [
           Text(label,
               style: const TextStyle(color: AnweshanTheme.onSurfaceVariant)),
-          Text(value, style: const TextStyle(fontWeight: FontWeight.w600)),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              value,
+              textAlign: TextAlign.end,
+              style: const TextStyle(fontWeight: FontWeight.w600),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
         ],
       ),
     );
@@ -157,22 +201,24 @@ class DocumentDetailScreen extends StatelessWidget {
             label: const Text('Download'),
           ),
         ),
-        const SizedBox(width: 16),
-        Container(
-          height: 56,
-          width: 56,
-          decoration: BoxDecoration(
-            color: Colors.red.withValues(alpha: 0.1),
-            borderRadius: BorderRadius.circular(16),
+        if (context.watch<AuthService>().isAdmin) ...[
+          const SizedBox(width: 16),
+          Container(
+            height: 56,
+            width: 56,
+            decoration: BoxDecoration(
+              color: Colors.red.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: IconButton(
+              icon: const Icon(Icons.delete_outline, color: Colors.red),
+              onPressed: () {
+                _showDeleteConfirmation(
+                    context, doc, storageService, databaseService);
+              },
+            ),
           ),
-          child: IconButton(
-            icon: const Icon(Icons.delete_outline, color: Colors.red),
-            onPressed: () {
-              _showDeleteConfirmation(
-                  context, doc, storageService, databaseService);
-            },
-          ),
-        ),
+        ],
       ],
     );
   }
@@ -205,7 +251,7 @@ class DocumentDetailScreen extends StatelessWidget {
                 await databaseService.deleteDocument(doc.id);
 
                 if (context.mounted) {
-                  Navigator.pop(context); // Go back from detail screen
+                  Navigator.pop(context, true); // Go back from detail screen with success flag
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
                         content: Text('Document deleted successfully')),

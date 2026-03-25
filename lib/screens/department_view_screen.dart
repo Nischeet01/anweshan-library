@@ -22,6 +22,27 @@ class DepartmentViewScreen extends StatefulWidget {
 
 class _DepartmentViewScreenState extends State<DepartmentViewScreen> {
   final DatabaseService _databaseService = DatabaseService();
+  late Stream<List<FolderModel>> _foldersStream;
+  late Stream<List<DocumentModel>> _documentsStream;
+
+  @override
+  void initState() {
+    super.initState();
+    _initStreams();
+  }
+
+  void _initStreams() {
+    _foldersStream = _databaseService.streamFolders(widget.folderId);
+    _documentsStream = _databaseService.getDocumentsByFolder(widget.folderId);
+  }
+
+  void _refreshData() {
+    if (mounted) {
+      setState(() {
+        _initStreams();
+      });
+    }
+  }
 
   void _showCreateFolderDialog(BuildContext context) {
     final TextEditingController folderNameController = TextEditingController();
@@ -47,7 +68,7 @@ class _DepartmentViewScreenState extends State<DepartmentViewScreen> {
                   await _databaseService.createFolder(name, widget.folderId);
                   if (context.mounted) {
                     Navigator.pop(dialogContext);
-                    setState(() {}); // refresh folders
+                    _refreshData();
                   }
                 }
               },
@@ -91,17 +112,20 @@ class _DepartmentViewScreenState extends State<DepartmentViewScreen> {
               ListTile(
                 leading: const Icon(Icons.upload_file, color: AnweshanTheme.primaryDeep),
                 title: const Text('Upload Document'),
-                onTap: () {
-                  Navigator.pop(context);
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => UploadScreen(
-                        initialFolderId: widget.folderId,
-                      ),
+              onTap: () async {
+                Navigator.pop(context);
+                final result = await Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => UploadScreen(
+                      initialFolderId: widget.folderId,
                     ),
-                  );
-                },
+                  ),
+                );
+                if (result == true && context.mounted) {
+                  _refreshData();
+                }
+              },
               ),
             ],
           ),
@@ -150,7 +174,7 @@ class _DepartmentViewScreenState extends State<DepartmentViewScreen> {
             const SizedBox(height: 32),
             Text('Documents', style: Theme.of(context).textTheme.headlineMedium?.copyWith(fontSize: 18)),
             const SizedBox(height: 12),
-            _buildDocumentsList(),
+            _buildDocumentsList(isAdmin),
           ],
         ),
       ),
@@ -159,7 +183,7 @@ class _DepartmentViewScreenState extends State<DepartmentViewScreen> {
 
   Widget _buildFoldersGrid() {
     return StreamBuilder<List<FolderModel>>(
-      stream: _databaseService.streamFolders(widget.folderId),
+      stream: _foldersStream,
       builder: (context, snapshot) {
         if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
         final folders = snapshot.data!;
@@ -231,9 +255,9 @@ class _DepartmentViewScreenState extends State<DepartmentViewScreen> {
     );
   }
 
-  Widget _buildDocumentsList() {
+  Widget _buildDocumentsList(bool isAdmin) {
     return StreamBuilder<List<DocumentModel>>(
-      stream: _databaseService.getDocumentsByFolder(widget.folderId),
+      stream: _documentsStream,
       builder: (context, snapshot) {
         if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
         final docs = snapshot.data!;
@@ -294,13 +318,18 @@ class _DepartmentViewScreenState extends State<DepartmentViewScreen> {
                   '${doc.uploadedBy.isNotEmpty ? doc.uploadedBy : 'Admin'} • ${_formatDate(doc.uploadDate)}',
                   style: Theme.of(context).textTheme.labelMedium,
                 ),
-                trailing: const Icon(Icons.more_vert, color: Colors.grey),
-                onTap: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => DocumentDetailScreen(document: doc),
-                  ),
-                ),
+                trailing: isAdmin ? const Icon(Icons.more_vert, color: Colors.grey) : null,
+                onTap: () async {
+                  final result = await Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => DocumentDetailScreen(document: doc),
+                    ),
+                  );
+                  if (result == true && context.mounted) {
+                    _refreshData();
+                  }
+                },
               ),
             );
           },

@@ -18,6 +18,7 @@ class DashboardScreen extends StatefulWidget {
 class _DashboardScreenState extends State<DashboardScreen> {
   int _selectedIndex = 0;
   final DatabaseService _databaseService = DatabaseService();
+  final GlobalKey<_DashboardContentState> _dashboardKey = GlobalKey();
 
   void _onItemTapped(int index) {
     setState(() {
@@ -39,9 +40,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 leading: const Icon(Icons.description, color: AnweshanTheme.primaryDeep),
                 title: const Text('Upload Document'),
                 onTap: () async {
-                  Navigator.pop(context);
-                  await Navigator.pushNamed(context, '/upload');
-                  if (_selectedIndex == 0) setState(() {});
+                  Navigator.pop(context); // Close bottom sheet
+                  final result = await Navigator.pushNamed(context, '/upload');
+                  if (result == true && mounted) {
+                    if (_selectedIndex == 0) {
+                      _dashboardKey.currentState?._refreshData();
+                    }
+                  }
                 },
               ),
               ListTile(
@@ -83,7 +88,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   await _databaseService.createFolder(name, null);
                   if (context.mounted) {
                     Navigator.pop(dialogContext);
-                    setState(() {}); // refresh folders
+                    if (_selectedIndex == 0) {
+                      _dashboardKey.currentState?._refreshData();
+                    }
                   }
                 }
               },
@@ -103,8 +110,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
       body: IndexedStack(
         index: _selectedIndex,
         children: [
-          const _DashboardContent(),
-          DepartmentViewScreen(), // Kept the class name, but it will be updated
+          _DashboardContent(key: _dashboardKey),
+          DepartmentViewScreen(), 
           const SearchScreen(),
           const SettingsScreen(),
         ],
@@ -166,7 +173,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 }
 
 class _DashboardContent extends StatefulWidget {
-  const _DashboardContent();
+  const _DashboardContent({super.key});
 
   @override
   State<_DashboardContent> createState() => _DashboardContentState();
@@ -175,6 +182,38 @@ class _DashboardContent extends StatefulWidget {
 class _DashboardContentState extends State<_DashboardContent> {
   final DatabaseService _databaseService = DatabaseService();
   final TextEditingController _searchController = TextEditingController();
+  late Stream<List<FolderModel>> _foldersStream;
+  late Stream<List<DocumentModel>> _rootDocumentsStream;
+
+  @override
+  void initState() {
+    super.initState();
+    _initStreams();
+  }
+
+  void _initStreams() {
+    _foldersStream = _databaseService.streamFolders(null);
+    _rootDocumentsStream = _databaseService.getDocumentsByFolder(null);
+  }
+
+  void _refreshData() {
+    if (mounted) {
+      setState(() {
+        _initStreams();
+      });
+    }
+  }
+
+  String _getGreeting() {
+    var hour = DateTime.now().hour;
+    if (hour < 12) {
+      return 'Good Morning,';
+    }
+    if (hour < 17) {
+      return 'Good Afternoon,';
+    }
+    return 'Good Evening,';
+  }
   List<DocumentModel>? _searchResults;
   bool _isSearching = false;
   Timer? _debounce;
@@ -229,7 +268,7 @@ class _DashboardContentState extends State<_DashboardContent> {
                   await _databaseService.createFolder(name, null);
                   if (context.mounted) {
                     Navigator.pop(dialogContext);
-                    setState(() {}); // refresh folders
+                    _refreshData();
                   }
                 }
               },
@@ -259,12 +298,12 @@ class _DashboardContentState extends State<_DashboardContent> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Anweshan Hub',
-                      style: Theme.of(context).textTheme.headlineMedium,
+                      _getGreeting(),
+                      style: Theme.of(context).textTheme.labelLarge?.copyWith(fontSize: 14),
                     ),
                     Text(
-                      'Welcome back',
-                      style: Theme.of(context).textTheme.labelLarge,
+                      'Anweshan Hub',
+                      style: Theme.of(context).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold),
                     ),
                   ],
                 ),
@@ -294,7 +333,7 @@ class _DashboardContentState extends State<_DashboardContent> {
               const SizedBox(height: 16),
               _buildFoldersGrid(context),
               const SizedBox(height: 40),
-              _buildSectionHeader(context, 'Root Documents', true),
+              _buildSectionHeader(context, 'Recent Documents', true),
               const SizedBox(height: 16),
               _buildRootDocuments(context),
             ],
@@ -359,12 +398,17 @@ class _DashboardContentState extends State<_DashboardContent> {
 
   Widget _buildDocListItem(BuildContext context, DocumentModel doc) {
     return InkWell(
-      onTap: () => Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (context) => DocumentDetailScreen(document: doc),
-        ),
-      ),
+      onTap: () async {
+        final result = await Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => DocumentDetailScreen(document: doc),
+          ),
+        );
+        if (result == true && mounted) {
+          _refreshData();
+        }
+      },
       child: Container(
         margin: const EdgeInsets.only(bottom: 12),
         padding: const EdgeInsets.all(12),
@@ -390,7 +434,7 @@ class _DashboardContentState extends State<_DashboardContent> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(doc.title,
+                   Text(doc.title,
                       style: const TextStyle(fontWeight: FontWeight.bold)),
                   Text(
                     '${doc.uploadedBy.isNotEmpty ? doc.uploadedBy : 'Admin'} • ${doc.uploadDate.day}/${doc.uploadDate.month}',
@@ -427,71 +471,32 @@ class _DashboardContentState extends State<_DashboardContent> {
   }
 
   Widget _buildRootDocuments(BuildContext context) {
-    return SizedBox(
-      height: 200,
-      child: StreamBuilder<List<DocumentModel>>(
-        stream: _databaseService.getDocumentsByFolder(null),
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          if (snapshot.hasError) {
-            return Center(
-              child: Text('Error loading documents',
-                  style: TextStyle(color: Colors.red[400])),
-            );
-          }
-          final docs = snapshot.data ?? [];
-          if (docs.isEmpty) {
-            return _buildEmptyState();
-          }
-          return ListView.builder(
-            scrollDirection: Axis.horizontal,
-            clipBehavior: Clip.none,
-            itemCount: docs.length,
-            itemBuilder: (context, index) {
-              final doc = docs[index];
-              return InkWell(
-                onTap: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => DocumentDetailScreen(document: doc),
-                  ),
-                ),
-                child: Container(
-                  width: 160,
-                  margin: const EdgeInsets.only(right: 16),
-                  child: Card(
-                    elevation: 4,
-                    shadowColor: Colors.black12,
-                    child: Padding(
-                      padding: const EdgeInsets.all(16.0),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Icon(Icons.article_outlined,
-                              size: 40, color: AnweshanTheme.accentGoldDim),
-                          const Spacer(),
-                          Text(
-                            doc.title,
-                            style: const TextStyle(fontWeight: FontWeight.bold),
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                              'Document', // Root document
-                              style: Theme.of(context).textTheme.labelLarge),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              );
-            },
+    return StreamBuilder<List<DocumentModel>>(
+      stream: _rootDocumentsStream,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        if (snapshot.hasError) {
+          return Center(
+            child: Text('Error loading documents',
+                style: TextStyle(color: Colors.red[400])),
           );
-        },
-      ),
+        }
+        final docs = snapshot.data ?? [];
+        if (docs.isEmpty) {
+          return _buildEmptyState();
+        }
+        return ListView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          itemCount: docs.length,
+          itemBuilder: (context, index) {
+            final doc = docs[index];
+            return _buildDocListItem(context, doc);
+          },
+        );
+      },
     );
   }
 
@@ -526,7 +531,7 @@ class _DashboardContentState extends State<_DashboardContent> {
 
   Widget _buildFoldersGrid(BuildContext context) {
     return StreamBuilder<List<FolderModel>>(
-      stream: _databaseService.streamFolders(null),
+      stream: _foldersStream,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(child: CircularProgressIndicator());
@@ -540,53 +545,51 @@ class _DashboardContentState extends State<_DashboardContent> {
           return const Text('No folders available.',
               style: TextStyle(color: AnweshanTheme.onSurfaceVariant));
         }
-        return GridView.builder(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 3,
-            mainAxisSpacing: 12,
-            crossAxisSpacing: 12,
-            childAspectRatio: 2.5,
-          ),
-          itemCount: folders.length,
-          itemBuilder: (context, index) {
-            final folder = folders[index];
-            return InkWell(
-              onTap: () => Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => DepartmentViewScreen(
-                    folderId: folder.id,
-                    folderName: folder.name,
+        return SizedBox(
+          height: 110,
+          child: ListView.builder(
+            scrollDirection: Axis.horizontal,
+            itemCount: folders.length,
+            clipBehavior: Clip.none,
+            itemBuilder: (context, index) {
+              final folder = folders[index];
+              return InkWell(
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => DepartmentViewScreen(
+                      folderId: folder.id,
+                      folderName: folder.name,
+                    ),
                   ),
                 ),
-              ),
-              child: Container(
-                decoration: BoxDecoration(
-                  color: AnweshanTheme.primaryDeep.withValues(alpha: 0.05),
-                  borderRadius:
-                      BorderRadius.circular(AnweshanTheme.pillRadius),
-                ),
-                alignment: Alignment.center,
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const Icon(Icons.folder, color: AnweshanTheme.primaryDeep, size: 16),
-                    const SizedBox(width: 4),
-                    Flexible(
-                      child: Text(
+                child: Container(
+                  width: 140,
+                  margin: const EdgeInsets.only(right: 16),
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: AnweshanTheme.primaryDeep.withValues(alpha: 0.05),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: Colors.transparent),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Icon(Icons.folder,
+                          color: AnweshanTheme.primaryDeep, size: 36),
+                      Text(
                         folder.name,
                         style: const TextStyle(
-                            fontWeight: FontWeight.w600, fontSize: 13),
+                            fontWeight: FontWeight.w600, fontSize: 14),
                         overflow: TextOverflow.ellipsis,
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
-            );
-          },
+              );
+            },
+          ),
         );
       },
     );
@@ -738,12 +741,17 @@ class _SearchScreenState extends State<SearchScreen> {
 
   Widget _buildDocListItem(BuildContext context, DocumentModel doc) {
     return InkWell(
-      onTap: () => Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (context) => DocumentDetailScreen(document: doc),
-        ),
-      ),
+      onTap: () async {
+        final result = await Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => DocumentDetailScreen(document: doc),
+          ),
+        );
+        if (result == true && mounted) {
+          _onSearch(_searchController.text);
+        }
+      },
       child: Container(
         margin: const EdgeInsets.only(bottom: 12),
         padding: const EdgeInsets.all(12),

@@ -126,7 +126,7 @@ class _UploadScreenState extends State<UploadScreen> {
 
       if (mounted) {
         _showSnackBar('Document uploaded successfully! 🎉');
-        Navigator.pop(context);
+        Navigator.pop(context, true);
       }
     } catch (e) {
       debugPrint('Upload error: $e');
