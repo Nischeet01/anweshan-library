@@ -79,7 +79,7 @@ class AuthService extends ChangeNotifier {
     try {
       await _supabase.auth.signInWithOAuth(
         OAuthProvider.google,
-        redirectTo: kIsWeb ? null : 'com.example.libraryapp://login-callback', // Adjust if needed
+        redirectTo: kIsWeb ? null : 'anweshanlibrary://login-callback/',
       );
     } catch (e) {
       debugPrint('Google Sign-In error: $e');
