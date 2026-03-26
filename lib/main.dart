@@ -28,18 +28,39 @@ class AnweshanApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return ChangeNotifierProvider(
       create: (context) => AuthService(),
-      child: MaterialApp(
-        title: 'Anweshan Document Library',
-        debugShowCheckedModeBanner: false,
-        theme: AnweshanTheme.lightTheme,
-        initialRoute: '/',
-        routes: {
-          '/': (context) => const LoginScreen(),
-          '/signup': (context) => const SignUpScreen(),
-          '/dashboard': (context) => const DashboardScreen(),
-          '/department': (context) => DepartmentViewScreen(),
-          '/upload': (context) => const UploadScreen(),
-          '/settings': (context) => const SettingsScreen(),
+      child: Consumer<AuthService>(
+        builder: (context, authService, _) {
+          return MaterialApp(
+            title: 'Anweshan Document Library',
+            debugShowCheckedModeBanner: false,
+            theme: AnweshanTheme.lightTheme,
+            // Use a StreamBuilder to listen to auth state changes for the initial screen
+            home: StreamBuilder<AuthState>(
+              stream: authService.authStateChanges,
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Scaffold(
+                    body: Center(child: CircularProgressIndicator()),
+                  );
+                }
+                
+                final session = snapshot.data?.session;
+                if (session != null) {
+                  return const DashboardScreen();
+                } else {
+                  return const LoginScreen();
+                }
+              },
+            ),
+            routes: {
+              '/login': (context) => const LoginScreen(),
+              '/signup': (context) => const SignUpScreen(),
+              '/dashboard': (context) => const DashboardScreen(),
+              '/department': (context) => const DepartmentViewScreen(),
+              '/upload': (context) => const UploadScreen(),
+              '/settings': (context) => const SettingsScreen(),
+            },
+          );
         },
       ),
     );

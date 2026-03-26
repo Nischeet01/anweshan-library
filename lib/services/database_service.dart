@@ -176,4 +176,9 @@ class DatabaseService {
 
     return (response as List).map((row) => DocumentModel.fromMap(row)).toList();
   }
+
+  /// Delete a folder record.
+  Future<void> deleteFolder(String folderId) async {
+    await _supabase.from('folders').delete().eq('id', folderId);
+  }
 }

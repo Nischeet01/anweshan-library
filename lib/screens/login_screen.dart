@@ -27,9 +27,7 @@ class _LoginScreenState extends State<LoginScreen> {
         _emailController.text.trim(),
         _passwordController.text.trim(),
       );
-      if (success && mounted) {
-        Navigator.pushReplacementNamed(context, '/dashboard');
-      } else if (mounted) {
+      if (!success && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: const Text('Login failed. Please check your credentials.'),
@@ -63,19 +61,25 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
-  void _handleGoogleSignIn() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: const Text('Google Sign-In coming soon!'),
-        backgroundColor: AnweshanTheme.primaryDeep,
-        behavior: SnackBarBehavior.floating,
-        margin: EdgeInsets.only(
-          bottom: MediaQuery.of(context).size.height - 100,
-          left: 20,
-          right: 20,
-        ),
-      ),
-    );
+  Future<void> _handleGoogleSignIn() async {
+    setState(() => _isLoading = true);
+    try {
+      final authService = Provider.of<AuthService>(context, listen: false);
+      await authService.signInWithGoogle();
+      // On Web, signInWithOAuth redirects the entire page, so code below might not execute
+      // unless it's a popup flow (which we didn't specify, but Supabase default is redirect).
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Google Sign-In Error: ${e.toString()}'),
+            backgroundColor: Theme.of(context).colorScheme.error,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
   }
 
   @override

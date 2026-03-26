@@ -134,6 +134,45 @@ class _DepartmentViewScreenState extends State<DepartmentViewScreen> {
     );
   }
 
+  Future<void> _confirmDeleteFolder(BuildContext context) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Confirm Delete'),
+        content: const Text('Are you sure you want to delete this folder? All contents may be lost.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && mounted) {
+      try {
+        await _databaseService.deleteFolder(widget.folderId!);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Folder deleted')),
+          );
+          Navigator.pop(context, true);
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Error deleting folder: $e')),
+          );
+        }
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final isAdmin = context.watch<AuthService>().isAdmin;
@@ -154,6 +193,29 @@ class _DepartmentViewScreenState extends State<DepartmentViewScreen> {
           style: Theme.of(context).textTheme.headlineMedium?.copyWith(fontSize: 20),
         ),
         centerTitle: true,
+        actions: [
+          if (isAdmin && widget.folderId != null)
+            PopupMenuButton<String>(
+              icon: const Icon(Icons.more_vert, color: AnweshanTheme.onSurface),
+              onSelected: (value) {
+                if (value == 'delete') {
+                  _confirmDeleteFolder(context);
+                }
+              },
+              itemBuilder: (context) => [
+                const PopupMenuItem(
+                  value: 'delete',
+                  child: Row(
+                    children: [
+                      Icon(Icons.delete_outline, color: Colors.red, size: 20),
+                      SizedBox(width: 8),
+                      Text('Delete Folder', style: TextStyle(color: Colors.red)),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+        ],
       ),
       floatingActionButton: isAdmin
           ? FloatingActionButton(
@@ -221,15 +283,20 @@ class _DepartmentViewScreenState extends State<DepartmentViewScreen> {
               color: Colors.white,
               child: InkWell(
                 borderRadius: BorderRadius.circular(16),
-                onTap: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => DepartmentViewScreen(
-                      folderId: folder.id,
-                      folderName: folder.name,
+                onTap: () async {
+                  final result = await Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => DepartmentViewScreen(
+                        folderId: folder.id,
+                        folderName: folder.name,
+                      ),
                     ),
-                  ),
-                ),
+                  );
+                  if (result == true && mounted) {
+                    _refreshData();
+                  }
+                },
                 child: Padding(
                   padding: const EdgeInsets.all(16.0),
                   child: Column(

@@ -111,7 +111,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         index: _selectedIndex,
         children: [
           _DashboardContent(key: _dashboardKey),
-          DepartmentViewScreen(), 
+          const DepartmentViewScreen(), 
           const SearchScreen(),
           const SettingsScreen(),
         ],
@@ -554,15 +554,20 @@ class _DashboardContentState extends State<_DashboardContent> {
             itemBuilder: (context, index) {
               final folder = folders[index];
               return InkWell(
-                onTap: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => DepartmentViewScreen(
-                      folderId: folder.id,
-                      folderName: folder.name,
+                onTap: () async {
+                  final result = await Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => DepartmentViewScreen(
+                        folderId: folder.id,
+                        folderName: folder.name,
+                      ),
                     ),
-                  ),
-                ),
+                  );
+                  if (result == true && mounted) {
+                    _refreshData();
+                  }
+                },
                 child: Container(
                   width: 140,
                   margin: const EdgeInsets.only(right: 16),

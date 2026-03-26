@@ -28,11 +28,11 @@ class AuthService extends ChangeNotifier {
           .eq('id', userId)
           .single();
       _userRole = data['role'] as String? ?? 'viewer';
-      print('DEBUG: Fetched user role is $_userRole');
+      debugPrint('DEBUG: Fetched user role is $_userRole');
     } catch (e) {
       debugPrint('Error fetching role: $e');
       _userRole = 'viewer';
-      print('DEBUG: Fetched user role is $_userRole');
+      debugPrint('DEBUG: Fetched user role is $_userRole');
     }
     notifyListeners();
   }
@@ -71,6 +71,18 @@ class AuthService extends ChangeNotifier {
       notifyListeners();
     } catch (e) {
       debugPrint('Sign up error: $e');
+      rethrow;
+    }
+  }
+
+  Future<void> signInWithGoogle() async {
+    try {
+      await _supabase.auth.signInWithOAuth(
+        OAuthProvider.google,
+        redirectTo: kIsWeb ? null : 'com.example.libraryapp://login-callback', // Adjust if needed
+      );
+    } catch (e) {
+      debugPrint('Google Sign-In error: $e');
       rethrow;
     }
   }

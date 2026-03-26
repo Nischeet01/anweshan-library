@@ -65,19 +65,23 @@ class _SignUpScreenState extends State<SignUpScreen> {
     }
   }
 
-  void _handleGoogleSignUp() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: const Text('Google Sign-In coming soon!'),
-        backgroundColor: AnweshanTheme.primaryDeep,
-        behavior: SnackBarBehavior.floating,
-        margin: EdgeInsets.only(
-          bottom: MediaQuery.of(context).size.height - 100,
-          left: 20,
-          right: 20,
-        ),
-      ),
-    );
+  Future<void> _handleGoogleSignUp() async {
+    setState(() => _isLoading = true);
+    try {
+      final authService = Provider.of<AuthService>(context, listen: false);
+      await authService.signInWithGoogle();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Google Sign-In Error: ${e.toString()}'),
+            backgroundColor: Theme.of(context).colorScheme.error,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
   }
 
   @override
