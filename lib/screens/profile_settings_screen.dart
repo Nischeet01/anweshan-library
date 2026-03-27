@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import '../theme.dart';
 
 class ProfileSettingsScreen extends StatefulWidget {
   const ProfileSettingsScreen({super.key});
@@ -92,7 +91,7 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
         title: const Text('Profile Settings'),
         backgroundColor: Colors.transparent,
         elevation: 0,
-        foregroundColor: AnweshanTheme.primaryDeep,
+        foregroundColor: Theme.of(context).colorScheme.onSurface,
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
@@ -101,39 +100,38 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text('Email Address',
+                  Text('Email Address',
                       style: TextStyle(
                           fontWeight: FontWeight.bold,
-                          color: AnweshanTheme.onSurfaceVariant)),
+                          color: Theme.of(context).colorScheme.onSurfaceVariant)),
                   const SizedBox(height: 8),
                   TextFormField(
                     initialValue: _email,
                     readOnly: true,
-                    decoration: const InputDecoration(
+                    decoration: InputDecoration(
                       filled: true,
-                      fillColor:
-                          Color(0xFFEDEEEF), // Consistent with theme.dart
+                      fillColor: Theme.of(context).inputDecorationTheme.fillColor,
                     ),
                   ),
                   const SizedBox(height: 24),
-                  const Text('Role',
+                  Text('Role',
                       style: TextStyle(
                           fontWeight: FontWeight.bold,
-                          color: AnweshanTheme.onSurfaceVariant)),
+                          color: Theme.of(context).colorScheme.onSurfaceVariant)),
                   const SizedBox(height: 8),
                   TextFormField(
                     initialValue: _role,
                     readOnly: true,
-                    decoration: const InputDecoration(
+                    decoration: InputDecoration(
                       filled: true,
-                      fillColor: Color(0xFFEDEEEF),
+                      fillColor: Theme.of(context).inputDecorationTheme.fillColor,
                     ),
                   ),
                   const SizedBox(height: 24),
-                  const Text('Full Name',
+                  Text('Full Name',
                       style: TextStyle(
                           fontWeight: FontWeight.bold,
-                          color: AnweshanTheme.onSurfaceVariant)),
+                          color: Theme.of(context).colorScheme.onSurfaceVariant)),
                   const SizedBox(height: 8),
                   TextFormField(
                     controller: _fullNameController,

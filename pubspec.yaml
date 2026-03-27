@@ -17,14 +17,42 @@ dependencies:
   path_provider: ^2.1.2
   url_launcher: ^6.2.5
   syncfusion_flutter_pdfviewer: ^33.1.45
+  shared_preferences: ^2.5.5
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^3.0.1
+  flutter_native_splash: ^2.4.0
+  flutter_launcher_icons: ^0.13.1
 
 flutter:
   uses-material-design: true
   assets:
     - assets/images/
     - assets/icons/
+    - assets/
+
+flutter_native_splash:
+  color: "#FFFFFF"
+  color_dark: "#121212"
+  image: "assets/splash_logo_light.png"
+  image_dark: "assets/splash_logo_dark.png"
+  android: true
+  ios: true
+  web: true
+  android_gravity: center
+  ios_content_mode: center
+  android_12:
+    color: "#FFFFFF"
+    color_dark: "#121212"
+    image: "assets/splash_logo_light.png"
+    image_dark: "assets/splash_logo_dark.png"
+
+flutter_launcher_icons:
+  android: "launcher_icon"
+  ios: true
+  image_path: "assets/splash_logo_light.png"
+  min_sdk_android: 21
+  adaptive_icon_background: "#FFFFFF"
+  adaptive_icon_foreground: "assets/splash_logo_light.png"

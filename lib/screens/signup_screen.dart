@@ -92,7 +92,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
         backgroundColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: AnweshanTheme.primaryDeep),
+          icon: Icon(Icons.arrow_back, color: Theme.of(context).colorScheme.onSurface),
           onPressed: () => Navigator.pop(context),
         ),
       ),
@@ -108,8 +108,8 @@ class _SignUpScreenState extends State<SignUpScreen> {
                 Container(
                   width: 80,
                   height: 80,
-                  decoration: const BoxDecoration(
-                    color: AnweshanTheme.secondaryGold,
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.secondary,
                     shape: BoxShape.circle,
                   ),
                   child: const Icon(Icons.person_add_outlined,
@@ -217,10 +217,10 @@ class _SignUpScreenState extends State<SignUpScreen> {
                     const Text("Already have an account?"),
                     TextButton(
                       onPressed: () => Navigator.pop(context),
-                      child: const Text(
+                      child: Text(
                         'Login',
                         style: TextStyle(
-                          color: AnweshanTheme.primaryDeep,
+                          color: Theme.of(context).colorScheme.primary,
                           fontWeight: FontWeight.bold,
                         ),
                       ),

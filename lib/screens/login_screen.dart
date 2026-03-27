@@ -104,8 +104,8 @@ class _LoginScreenState extends State<LoginScreen> {
                   Container(
                     width: 80,
                     height: 80,
-                    decoration: const BoxDecoration(
-                      color: AnweshanTheme.primaryDeep,
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.primary,
                       shape: BoxShape.circle,
                     ),
                     child: const Icon(Icons.lock_outline,
@@ -195,9 +195,10 @@ class _LoginScreenState extends State<LoginScreen> {
                   const SizedBox(height: 16),
                   TextButton(
                     onPressed: () {},
-                    child: const Text(
+                    child: Text(
                       'Forgot Password?',
-                      style: TextStyle(color: AnweshanTheme.primaryDeep),
+                      style: TextStyle(
+                          color: Theme.of(context).colorScheme.primary),
                     ),
                   ),
                   const SizedBox(height: 24),

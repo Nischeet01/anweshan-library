@@ -27,15 +27,20 @@ class DocumentDetailScreen extends StatelessWidget {
 
   _FileTypeInfo _getFileTypeInfo(String ext) {
     if (_pdfExtensions.contains(ext)) {
-      return _FileTypeInfo(Icons.picture_as_pdf_rounded, const Color(0xFFE53935), 'PDF Document');
+      return _FileTypeInfo(Icons.picture_as_pdf_rounded,
+          const Color(0xFFE53935), 'PDF Document');
     } else if (_docExtensions.contains(ext)) {
-      return _FileTypeInfo(Icons.article_rounded, const Color(0xFF1E88E5), 'Word Document');
+      return _FileTypeInfo(
+          Icons.article_rounded, const Color(0xFF1E88E5), 'Word Document');
     } else if (_slideExtensions.contains(ext)) {
-      return _FileTypeInfo(Icons.slideshow_rounded, const Color(0xFFF4511E), 'Presentation');
+      return _FileTypeInfo(
+          Icons.slideshow_rounded, const Color(0xFFF4511E), 'Presentation');
     } else if (_sheetExtensions.contains(ext)) {
-      return _FileTypeInfo(Icons.table_chart_rounded, const Color(0xFF43A047), 'Spreadsheet');
+      return _FileTypeInfo(
+          Icons.table_chart_rounded, const Color(0xFF43A047), 'Spreadsheet');
     }
-    return _FileTypeInfo(Icons.insert_drive_file_rounded, AnweshanTheme.outline, 'File');
+    return _FileTypeInfo(
+        Icons.insert_drive_file_rounded, AnweshanTheme.outline, 'File');
   }
 
   @override
@@ -83,7 +88,8 @@ class DocumentDetailScreen extends StatelessWidget {
 
   // ─── FILE PREVIEW ──────────────────────────────────────────────
 
-  Widget _buildFilePreview(BuildContext context, DocumentModel doc, String ext) {
+  Widget _buildFilePreview(
+      BuildContext context, DocumentModel doc, String ext) {
     if (_isImage(ext)) {
       return _buildImagePreview(context, doc);
     }
@@ -108,8 +114,9 @@ class DocumentDetailScreen extends StatelessWidget {
         width: double.infinity,
         height: 300,
         decoration: BoxDecoration(
-          color: const Color(0xFFEDEEEF),
+          color: Theme.of(context).colorScheme.surface,
           borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.05)),
         ),
         clipBehavior: Clip.antiAlias,
         child: Stack(
@@ -123,7 +130,8 @@ class DocumentDetailScreen extends StatelessWidget {
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      const Icon(Icons.broken_image, size: 64, color: Colors.grey),
+                      Icon(Icons.broken_image,
+                          size: 64, color: Theme.of(context).colorScheme.onSurfaceVariant),
                       const SizedBox(height: 8),
                       Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -154,7 +162,8 @@ class DocumentDetailScreen extends StatelessWidget {
               bottom: 12,
               right: 12,
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                 decoration: BoxDecoration(
                   color: Colors.black.withValues(alpha: 0.6),
                   borderRadius: BorderRadius.circular(20),
@@ -179,7 +188,8 @@ class DocumentDetailScreen extends StatelessWidget {
   }
 
   /// Visually pleasing fallback for non-image files.
-  Widget _buildDocumentFallback(BuildContext context, DocumentModel doc, String ext) {
+  Widget _buildDocumentFallback(
+      BuildContext context, DocumentModel doc, String ext) {
     final info = _getFileTypeInfo(ext);
 
     return Container(
@@ -228,7 +238,8 @@ class DocumentDetailScreen extends StatelessWidget {
           Text(
             info.label,
             style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                  color: AnweshanTheme.onSurfaceVariant,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant
+,
                   fontWeight: FontWeight.w500,
                 ),
           ),
@@ -284,25 +295,25 @@ class DocumentDetailScreen extends StatelessWidget {
       BuildContext context, DocumentModel doc, String date) {
     return Column(
       children: [
-        _buildMetadataRow(
+        _buildMetadataRow(context, 
             'Uploaded By', doc.uploadedBy.isEmpty ? 'Admin' : doc.uploadedBy),
         const Divider(),
-        _buildMetadataRow('Date', date),
+        _buildMetadataRow(context, 'Date', date),
         const Divider(),
-        _buildMetadataRow(
+        _buildMetadataRow(context, 
             'Folder', doc.folderId == null ? 'Root' : doc.folderId!),
       ],
     );
   }
 
-  Widget _buildMetadataRow(String label, String value) {
+  Widget _buildMetadataRow(BuildContext context, String label, String value) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 12.0),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Text(label,
-              style: const TextStyle(color: AnweshanTheme.onSurfaceVariant)),
+              style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant)),
           const SizedBox(width: 8),
           Expanded(
             child: Text(

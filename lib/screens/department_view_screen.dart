@@ -17,10 +17,10 @@ class DepartmentViewScreen extends StatefulWidget {
   });
 
   @override
-  State<DepartmentViewScreen> createState() => _DepartmentViewScreenState();
+  State<DepartmentViewScreen> createState() => DepartmentViewScreenState();
 }
 
-class _DepartmentViewScreenState extends State<DepartmentViewScreen> {
+class DepartmentViewScreenState extends State<DepartmentViewScreen> {
   final DatabaseService _databaseService = DatabaseService();
   late Stream<List<FolderModel>> _foldersStream;
   late Stream<List<DocumentModel>> _documentsStream;
@@ -36,7 +36,7 @@ class _DepartmentViewScreenState extends State<DepartmentViewScreen> {
     _documentsStream = _databaseService.getDocumentsByFolder(widget.folderId);
   }
 
-  void _refreshData() {
+  void refreshData() {
     if (mounted) {
       setState(() {
         _initStreams();
@@ -68,7 +68,7 @@ class _DepartmentViewScreenState extends State<DepartmentViewScreen> {
                   await _databaseService.createFolder(name, widget.folderId);
                   if (context.mounted) {
                     Navigator.pop(dialogContext);
-                    _refreshData();
+                    refreshData();
                   }
                 }
               },
@@ -97,12 +97,13 @@ class _DepartmentViewScreenState extends State<DepartmentViewScreen> {
                 height: 4,
                 margin: const EdgeInsets.only(bottom: 24),
                 decoration: BoxDecoration(
-                  color: Colors.grey.shade300,
+                  color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
               ListTile(
-                leading: const Icon(Icons.create_new_folder, color: AnweshanTheme.primaryDeep),
+                leading: const Icon(Icons.create_new_folder,
+                    color: AnweshanTheme.primaryDeep),
                 title: const Text('Create Folder'),
                 onTap: () {
                   Navigator.pop(context);
@@ -110,22 +111,23 @@ class _DepartmentViewScreenState extends State<DepartmentViewScreen> {
                 },
               ),
               ListTile(
-                leading: const Icon(Icons.upload_file, color: AnweshanTheme.primaryDeep),
+                leading: const Icon(Icons.upload_file,
+                    color: AnweshanTheme.primaryDeep),
                 title: const Text('Upload Document'),
-              onTap: () async {
-                Navigator.pop(context);
-                final result = await Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => UploadScreen(
-                      initialFolderId: widget.folderId,
+                onTap: () async {
+                  Navigator.pop(context);
+                  final result = await Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => UploadScreen(
+                        initialFolderId: widget.folderId,
+                      ),
                     ),
-                  ),
-                );
-                if (result == true && context.mounted) {
-                  _refreshData();
-                }
-              },
+                  );
+                  if (result == true && context.mounted) {
+                    refreshData();
+                  }
+                },
               ),
             ],
           ),
@@ -139,7 +141,8 @@ class _DepartmentViewScreenState extends State<DepartmentViewScreen> {
       context: context,
       builder: (dialogContext) => AlertDialog(
         title: const Text('Confirm Delete'),
-        content: const Text('Are you sure you want to delete this folder? All contents may be lost.'),
+        content: const Text(
+            'Are you sure you want to delete this folder? All contents may be lost.'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext, false),
@@ -178,25 +181,30 @@ class _DepartmentViewScreenState extends State<DepartmentViewScreen> {
     final isAdmin = context.watch<AuthService>().isAdmin;
 
     return Scaffold(
-      backgroundColor: AnweshanTheme.background,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
-        leading: widget.folderId != null 
+        leading: widget.folderId != null
             ? IconButton(
-                icon: const Icon(Icons.arrow_back_ios_new, color: AnweshanTheme.onSurface),
+                icon: Icon(Icons.arrow_back_ios_new,
+                    color: Theme.of(context).colorScheme.onSurface),
                 onPressed: () => Navigator.pop(context),
               )
             : null,
         title: Text(
           widget.folderName,
-          style: Theme.of(context).textTheme.headlineMedium?.copyWith(fontSize: 20),
+          style: Theme.of(context)
+              .textTheme
+              .headlineMedium
+              ?.copyWith(fontSize: 20),
         ),
         centerTitle: true,
         actions: [
           if (isAdmin && widget.folderId != null)
             PopupMenuButton<String>(
-              icon: const Icon(Icons.more_vert, color: AnweshanTheme.onSurface),
+              icon: Icon(Icons.more_vert,
+                  color: Theme.of(context).colorScheme.onSurface),
               onSelected: (value) {
                 if (value == 'delete') {
                   _confirmDeleteFolder(context);
@@ -209,7 +217,8 @@ class _DepartmentViewScreenState extends State<DepartmentViewScreen> {
                     children: [
                       Icon(Icons.delete_outline, color: Colors.red, size: 20),
                       SizedBox(width: 8),
-                      Text('Delete Folder', style: TextStyle(color: Colors.red)),
+                      Text('Delete Folder',
+                          style: TextStyle(color: Colors.red)),
                     ],
                   ),
                 ),
@@ -225,19 +234,35 @@ class _DepartmentViewScreenState extends State<DepartmentViewScreen> {
               child: const Icon(Icons.add, color: Colors.white),
             )
           : null,
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Folders', style: Theme.of(context).textTheme.headlineMedium?.copyWith(fontSize: 18)),
-            const SizedBox(height: 12),
-            _buildFoldersGrid(),
-            const SizedBox(height: 32),
-            Text('Documents', style: Theme.of(context).textTheme.headlineMedium?.copyWith(fontSize: 18)),
-            const SizedBox(height: 12),
-            _buildDocumentsList(isAdmin),
-          ],
+      body: RefreshIndicator(
+        onRefresh: () async {
+          refreshData();
+        },
+        color: AnweshanTheme.primaryDeep,
+        backgroundColor: Colors.transparent,
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 16.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Folders',
+                  style: Theme.of(context)
+                      .textTheme
+                      .headlineMedium
+                      ?.copyWith(fontSize: 18)),
+              const SizedBox(height: 12),
+              _buildFoldersGrid(),
+              const SizedBox(height: 32),
+              Text('Documents',
+                  style: Theme.of(context)
+                      .textTheme
+                      .headlineMedium
+                      ?.copyWith(fontSize: 18)),
+              const SizedBox(height: 12),
+              _buildDocumentsList(isAdmin),
+            ],
+          ),
         ),
       ),
     );
@@ -247,16 +272,19 @@ class _DepartmentViewScreenState extends State<DepartmentViewScreen> {
     return StreamBuilder<List<FolderModel>>(
       stream: _foldersStream,
       builder: (context, snapshot) {
-        if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
+        if (!snapshot.hasData)
+          return const Center(child: CircularProgressIndicator());
         final folders = snapshot.data!;
         if (folders.isEmpty) {
           return Center(
             child: Column(
               children: [
                 const SizedBox(height: 20),
-                Icon(Icons.folder_open, size: 60, color: Colors.grey.withValues(alpha: 0.3)),
+                Icon(Icons.folder_open,
+                    size: 60, color: Colors.grey.withValues(alpha: 0.3)),
                 const SizedBox(height: 8),
-                const Text('This folder is empty', style: TextStyle(color: Colors.grey)),
+                const Text('This folder is empty',
+                    style: TextStyle(color: Colors.grey)),
               ],
             ),
           );
@@ -278,9 +306,13 @@ class _DepartmentViewScreenState extends State<DepartmentViewScreen> {
               elevation: 0,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(16),
-                side: BorderSide(color: Colors.grey.withValues(alpha: 0.2)),
+                side: BorderSide(
+                    color: Theme.of(context)
+                        .colorScheme
+                        .onSurface
+                        .withValues(alpha: 0.1)),
               ),
-              color: Colors.white,
+              color: Theme.of(context).colorScheme.surface,
               child: InkWell(
                 borderRadius: BorderRadius.circular(16),
                 onTap: () async {
@@ -294,7 +326,7 @@ class _DepartmentViewScreenState extends State<DepartmentViewScreen> {
                     ),
                   );
                   if (result == true && mounted) {
-                    _refreshData();
+                    refreshData();
                   }
                 },
                 child: Padding(
@@ -306,7 +338,8 @@ class _DepartmentViewScreenState extends State<DepartmentViewScreen> {
                       const SizedBox(height: 12),
                       Text(
                         folder.name,
-                        style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+                        style: const TextStyle(
+                            fontWeight: FontWeight.w600, fontSize: 14),
                         textAlign: TextAlign.center,
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
@@ -326,16 +359,19 @@ class _DepartmentViewScreenState extends State<DepartmentViewScreen> {
     return StreamBuilder<List<DocumentModel>>(
       stream: _documentsStream,
       builder: (context, snapshot) {
-        if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
+        if (!snapshot.hasData)
+          return const Center(child: CircularProgressIndicator());
         final docs = snapshot.data!;
         if (docs.isEmpty) {
           return Center(
             child: Column(
               children: [
                 const SizedBox(height: 20),
-                Icon(Icons.description_outlined, size: 60, color: Colors.grey.withValues(alpha: 0.3)),
+                Icon(Icons.description_outlined,
+                    size: 60, color: Colors.grey.withValues(alpha: 0.3)),
                 const SizedBox(height: 8),
-                const Text('No documents yet', style: TextStyle(color: Colors.grey)),
+                const Text('No documents yet',
+                    style: TextStyle(color: Colors.grey)),
               ],
             ),
           );
@@ -349,7 +385,7 @@ class _DepartmentViewScreenState extends State<DepartmentViewScreen> {
             final doc = docs[index];
             IconData fileIcon = Icons.insert_drive_file;
             Color iconColor = Colors.grey;
-            
+
             final ext = doc.title.split('.').last.toLowerCase();
             if (ext == 'pdf') {
               fileIcon = Icons.picture_as_pdf;
@@ -367,11 +403,16 @@ class _DepartmentViewScreenState extends State<DepartmentViewScreen> {
               margin: const EdgeInsets.only(bottom: 12),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
-                side: BorderSide(color: Colors.grey.withValues(alpha: 0.2)),
+                side: BorderSide(
+                    color: Theme.of(context)
+                        .colorScheme
+                        .onSurface
+                        .withValues(alpha: 0.1)),
               ),
-              color: Colors.white,
+              color: Theme.of(context).colorScheme.surface,
               child: ListTile(
-                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                contentPadding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                 leading: Container(
                   padding: const EdgeInsets.all(10),
                   decoration: BoxDecoration(
@@ -380,12 +421,17 @@ class _DepartmentViewScreenState extends State<DepartmentViewScreen> {
                   ),
                   child: Icon(fileIcon, color: iconColor),
                 ),
-                title: Text(doc.title, style: const TextStyle(fontWeight: FontWeight.w600)),
+                title: Text(doc.title,
+                    style: const TextStyle(fontWeight: FontWeight.w600)),
                 subtitle: Text(
                   '${doc.uploadedBy.isNotEmpty ? doc.uploadedBy : 'Admin'} • ${_formatDate(doc.uploadDate)}',
-                  style: Theme.of(context).textTheme.labelMedium,
+                  style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
                 ),
-                trailing: isAdmin ? const Icon(Icons.more_vert, color: Colors.grey) : null,
+                trailing: isAdmin
+                    ? Icon(Icons.more_vert, color: Theme.of(context).colorScheme.onSurfaceVariant)
+                    : null,
                 onTap: () async {
                   final result = await Navigator.push(
                     context,
@@ -394,7 +440,7 @@ class _DepartmentViewScreenState extends State<DepartmentViewScreen> {
                     ),
                   );
                   if (result == true && context.mounted) {
-                    _refreshData();
+                    refreshData();
                   }
                 },
               ),

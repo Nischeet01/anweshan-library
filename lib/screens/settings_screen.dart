@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../theme.dart';
 import '../services/auth_service.dart';
+import '../services/theme_provider.dart';
 import 'profile_settings_screen.dart';
 
 class SettingsScreen extends StatelessWidget {
@@ -9,31 +10,74 @@ class SettingsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final themeProvider = context.watch<ThemeProvider>();
+    final isDark = themeProvider.isDarkMode;
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Settings'),
         backgroundColor: Colors.transparent,
         elevation: 0,
-        foregroundColor: AnweshanTheme.primaryDeep,
+        foregroundColor: Theme.of(context).colorScheme.onSurface,
       ),
-      body: Padding(
+      body: SingleChildScrollView(
         padding: const EdgeInsets.all(24.0),
         child: Column(
           children: [
+            Container(
+              margin: const EdgeInsets.only(bottom: 16),
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.surface,
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(
+                    color: Theme.of(context)
+                        .colorScheme
+                        .onSurface
+                        .withValues(alpha: 0.05)),
+              ),
+              child: SwitchListTile(
+                title: const Text('Dark Mode',
+                    style:
+                        TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                subtitle: const Text('Toggle between light and dark themes',
+                    style: TextStyle(fontSize: 12)),
+                secondary: Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: AnweshanTheme.primaryDeep.withValues(alpha: 0.05),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(
+                    isDark ? Icons.dark_mode : Icons.light_mode,
+                    color: AnweshanTheme.primaryDeep,
+                  ),
+                ),
+                value: isDark,
+                onChanged: (bool value) {
+                  themeProvider.toggleTheme();
+                },
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(20)),
+                activeColor: AnweshanTheme.primaryDeep,
+              ),
+            ),
             _buildSettingTile(
-              Icons.person_outline, 
-              'Profile Settings', 
+              context,
+              Icons.person_outline,
+              'Profile Settings',
               'Manage your account and preferences',
               onTap: () {
                 Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (context) => const ProfileSettingsScreen()),
+                  MaterialPageRoute(
+                      builder: (context) => const ProfileSettingsScreen()),
                 );
               },
             ),
             _buildSettingTile(
-              Icons.notifications_outlined, 
-              'Notifications', 
+              context,
+              Icons.notifications_outlined,
+              'Notifications',
               'Configure your alert settings',
               onTap: () {
                 ScaffoldMessenger.of(context).showSnackBar(
@@ -42,8 +86,9 @@ class SettingsScreen extends StatelessWidget {
               },
             ),
             _buildSettingTile(
-              Icons.security_outlined, 
-              'Security', 
+              context,
+              Icons.security_outlined,
+              'Security',
               'Password and authentication settings',
               onTap: () {
                 ScaffoldMessenger.of(context).showSnackBar(
@@ -52,8 +97,9 @@ class SettingsScreen extends StatelessWidget {
               },
             ),
             _buildSettingTile(
-              Icons.help_outline, 
-              'Help & Support', 
+              context,
+              Icons.help_outline,
+              'Help & Support',
               'Get help or report an issue',
               onTap: () {
                 showDialog(
@@ -64,7 +110,9 @@ class SettingsScreen extends StatelessWidget {
                       mainAxisSize: MainAxisSize.min,
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('Anweshan Pvt.Ltd', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                        Text('Anweshan Pvt.Ltd',
+                            style: TextStyle(
+                                fontWeight: FontWeight.bold, fontSize: 16)),
                         SizedBox(height: 8),
                         Text('Talchikhel, Lalitpur, Nepal'),
                         Text('Phone: 977-01-5526674'),
@@ -76,21 +124,23 @@ class SettingsScreen extends StatelessWidget {
                     actions: [
                       TextButton(
                         onPressed: () => Navigator.pop(context),
-                        child: const Text('Close', style: TextStyle(color: AnweshanTheme.primaryDeep)),
+                        child: const Text('Close',
+                            style: TextStyle(color: AnweshanTheme.primaryDeep)),
                       ),
                     ],
                   ),
                 );
               },
             ),
-            const Spacer(),
+            const SizedBox(height: 32),
             SizedBox(
               width: double.infinity,
               child: ElevatedButton(
                 onPressed: () async {
                   await context.read<AuthService>().signOut();
                   if (context.mounted) {
-                    Navigator.pushNamedAndRemoveUntil(context, '/', (route) => false);
+                    Navigator.pushNamedAndRemoveUntil(
+                        context, '/', (route) => false);
                   }
                 },
                 style: ElevatedButton.styleFrom(
@@ -98,9 +148,11 @@ class SettingsScreen extends StatelessWidget {
                   foregroundColor: Colors.redAccent,
                   elevation: 0,
                   padding: const EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12)),
                 ),
-                child: const Text('Logout', style: TextStyle(fontWeight: FontWeight.bold)),
+                child: const Text('Logout',
+                    style: TextStyle(fontWeight: FontWeight.bold)),
               ),
             ),
           ],
@@ -109,13 +161,19 @@ class SettingsScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildSettingTile(IconData icon, String title, String subtitle, {VoidCallback? onTap}) {
+  Widget _buildSettingTile(BuildContext context, IconData icon, String title,
+      String subtitle,
+      {VoidCallback? onTap}) {
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).colorScheme.surface,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.black.withValues(alpha: 0.05)),
+        border: Border.all(
+            color: Theme.of(context)
+                .colorScheme
+                .onSurface
+                .withValues(alpha: 0.05)),
       ),
       child: InkWell(
         onTap: onTap,
@@ -123,30 +181,37 @@ class SettingsScreen extends StatelessWidget {
         child: Padding(
           padding: const EdgeInsets.all(16),
           child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: AnweshanTheme.primaryDeep.withValues(alpha: 0.05),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Icon(icon, color: AnweshanTheme.primaryDeep),
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: AnweshanTheme.primaryDeep.withValues(alpha: 0.05),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(icon, color: AnweshanTheme.primaryDeep),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(title,
+                        style: const TextStyle(
+                            fontWeight: FontWeight.bold, fontSize: 16)),
+                    Text(subtitle,
+                        style: TextStyle(
+                            color:
+                                Theme.of(context).colorScheme.onSurfaceVariant,
+                            fontSize: 12)),
+                  ],
+                ),
+              ),
+              Icon(Icons.chevron_right,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant),
+            ],
           ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                Text(subtitle, style: const TextStyle(color: Colors.grey, fontSize: 12)),
-              ],
-            ),
-          ),
-          const Icon(Icons.chevron_right, color: Colors.grey),
-        ],
+        ),
       ),
-    ),
-  ),
-);
+    );
   }
 }

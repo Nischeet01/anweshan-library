@@ -19,6 +19,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   int _selectedIndex = 0;
   final DatabaseService _databaseService = DatabaseService();
   final GlobalKey<_DashboardContentState> _dashboardKey = GlobalKey();
+  final GlobalKey<DepartmentViewScreenState> _foldersKey = GlobalKey();
 
   void _onItemTapped(int index) {
     setState(() {
@@ -37,20 +38,24 @@ class _DashboardScreenState extends State<DashboardScreen> {
           child: Wrap(
             children: <Widget>[
               ListTile(
-                leading: const Icon(Icons.description, color: AnweshanTheme.primaryDeep),
+                leading: const Icon(Icons.description,
+                    color: AnweshanTheme.primaryDeep),
                 title: const Text('Upload Document'),
                 onTap: () async {
                   Navigator.pop(context); // Close bottom sheet
                   final result = await Navigator.pushNamed(context, '/upload');
                   if (result == true && mounted) {
                     if (_selectedIndex == 0) {
-                      _dashboardKey.currentState?._refreshData();
+                      _dashboardKey.currentState?.refreshData();
+                    } else if (_selectedIndex == 1) {
+                      _foldersKey.currentState?.refreshData();
                     }
                   }
                 },
               ),
               ListTile(
-                leading: const Icon(Icons.create_new_folder, color: AnweshanTheme.primaryDeep),
+                leading: const Icon(Icons.create_new_folder,
+                    color: AnweshanTheme.primaryDeep),
                 title: const Text('Create Folder'),
                 onTap: () {
                   Navigator.pop(context);
@@ -89,7 +94,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   if (context.mounted) {
                     Navigator.pop(dialogContext);
                     if (_selectedIndex == 0) {
-                      _dashboardKey.currentState?._refreshData();
+                      _dashboardKey.currentState?.refreshData();
+                    } else if (_selectedIndex == 1) {
+                      _foldersKey.currentState?.refreshData();
                     }
                   }
                 }
@@ -111,7 +118,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         index: _selectedIndex,
         children: [
           _DashboardContent(key: _dashboardKey),
-          const DepartmentViewScreen(), 
+          DepartmentViewScreen(key: _foldersKey),
           const SearchScreen(),
           const SettingsScreen(),
         ],
@@ -196,7 +203,7 @@ class _DashboardContentState extends State<_DashboardContent> {
     _rootDocumentsStream = _databaseService.getDocumentsByFolder(null);
   }
 
-  void _refreshData() {
+  void refreshData() {
     if (mounted) {
       setState(() {
         _initStreams();
@@ -214,13 +221,14 @@ class _DashboardContentState extends State<_DashboardContent> {
     }
     return 'Good Evening,';
   }
+
   List<DocumentModel>? _searchResults;
   bool _isSearching = false;
   Timer? _debounce;
 
   void _onSearchChanged(String query) {
     if (_debounce?.isActive ?? false) _debounce!.cancel();
-    
+
     if (query.isEmpty) {
       setState(() {
         _isSearching = false;
@@ -231,7 +239,7 @@ class _DashboardContentState extends State<_DashboardContent> {
 
     setState(() {
       _isSearching = true;
-      _searchResults = null; 
+      _searchResults = null;
     });
 
     _debounce = Timer(const Duration(milliseconds: 500), () async {
@@ -268,7 +276,7 @@ class _DashboardContentState extends State<_DashboardContent> {
                   await _databaseService.createFolder(name, null);
                   if (context.mounted) {
                     Navigator.pop(dialogContext);
-                    _refreshData();
+                    refreshData();
                   }
                 }
               },
@@ -285,60 +293,76 @@ class _DashboardContentState extends State<_DashboardContent> {
     final isAdmin = Provider.of<AuthService>(context).isAdmin;
 
     return SafeArea(
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.symmetric(horizontal: 24.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const SizedBox(height: 24),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      _getGreeting(),
-                      style: Theme.of(context).textTheme.labelLarge?.copyWith(fontSize: 14),
-                    ),
-                    Text(
-                      'Anweshan Hub',
-                      style: Theme.of(context).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold),
-                    ),
-                  ],
-                ),
-                if (isAdmin)
-                  IconButton(
-                    icon: const Icon(Icons.create_new_folder, color: AnweshanTheme.primaryDeep),
-                    onPressed: () => _showCreateFolderDialog(context),
-                  )
-                else
-                  CircleAvatar(
-                    backgroundColor: AnweshanTheme.primaryDeep.withValues(alpha: 0.1),
-                    child: const Icon(Icons.person_outline,
-                        color: AnweshanTheme.primaryDeep),
+      child: RefreshIndicator(
+        onRefresh: () async {
+          refreshData();
+        },
+        color: AnweshanTheme.primaryDeep,
+        backgroundColor: Theme.of(context).colorScheme.surface,
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.symmetric(horizontal: 24.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const SizedBox(height: 24),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        _getGreeting(),
+                        style: Theme.of(context)
+                            .textTheme
+                            .labelLarge
+                            ?.copyWith(fontSize: 14),
+                      ),
+                      Text(
+                        'Anweshan Hub',
+                        style: Theme.of(context)
+                            .textTheme
+                            .headlineMedium
+                            ?.copyWith(fontWeight: FontWeight.bold),
+                      ),
+                    ],
                   ),
+                  if (isAdmin)
+                    IconButton(
+                      icon: const Icon(Icons.create_new_folder,
+                          color: AnweshanTheme.primaryDeep),
+                      onPressed: () => _showCreateFolderDialog(context),
+                    )
+                  else
+                    CircleAvatar(
+                      backgroundColor:
+                          AnweshanTheme.primaryDeep.withValues(alpha: 0.1),
+                      child: const Icon(Icons.person_outline,
+                          color: AnweshanTheme.primaryDeep),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 32),
+              _buildSearchBar(context),
+              if (_isSearching) ...[
+                const SizedBox(height: 40),
+                _buildSectionHeader(context, 'Search Results', false),
+                const SizedBox(height: 16),
+                _buildSearchResultsList(context),
+              ] else ...[
+                const SizedBox(height: 40),
+                _buildSectionHeader(context, 'Root Folders', false),
+                const SizedBox(height: 16),
+                _buildFoldersGrid(context),
+                const SizedBox(height: 40),
+                _buildSectionHeader(context, 'Recent Documents', true),
+                const SizedBox(height: 16),
+                _buildRootDocuments(context),
               ],
-            ),
-            const SizedBox(height: 32),
-            _buildSearchBar(context),
-            if (_isSearching) ...[
-              const SizedBox(height: 40),
-              _buildSectionHeader(context, 'Search Results', false),
-              const SizedBox(height: 16),
-              _buildSearchResultsList(context),
-            ] else ...[
-              const SizedBox(height: 40),
-              _buildSectionHeader(context, 'Root Folders', false),
-              const SizedBox(height: 16),
-              _buildFoldersGrid(context),
-              const SizedBox(height: 40),
-              _buildSectionHeader(context, 'Recent Documents', true),
-              const SizedBox(height: 16),
-              _buildRootDocuments(context),
+              const SizedBox(height: 100),
             ],
-            const SizedBox(height: 100), 
-          ],
+          ),
         ),
       ),
     );
@@ -347,18 +371,20 @@ class _DashboardContentState extends State<_DashboardContent> {
   Widget _buildSearchBar(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        color: const Color(0xFFEDEEEF),
+        color: Theme.of(context).colorScheme.surface,
         borderRadius: BorderRadius.circular(AnweshanTheme.pillRadius),
+        border: Border.all(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.1)),
       ),
       padding: const EdgeInsets.symmetric(horizontal: 20),
       child: TextField(
         controller: _searchController,
         onChanged: _onSearchChanged,
         decoration: InputDecoration(
-          icon: const Icon(Icons.search, color: AnweshanTheme.onSurfaceVariant),
+          icon: Icon(Icons.search, color: Theme.of(context).colorScheme.onSurfaceVariant),
           hintText: 'Search documents...',
           hintStyle: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                color: AnweshanTheme.onSurfaceVariant.withValues(alpha: 0.7),
+                color: Theme.of(context).colorScheme.onSurfaceVariant
+.withValues(alpha: 0.7),
               ),
           border: InputBorder.none,
           filled: false,
@@ -406,16 +432,20 @@ class _DashboardContentState extends State<_DashboardContent> {
           ),
         );
         if (result == true && mounted) {
-          _refreshData();
+          refreshData();
         }
       },
       child: Container(
         margin: const EdgeInsets.only(bottom: 12),
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: Theme.of(context).colorScheme.surface,
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: Colors.black.withValues(alpha: 0.05)),
+          border: Border.all(
+              color: Theme.of(context)
+                  .colorScheme
+                  .onSurface
+                  .withValues(alpha: 0.05)),
         ),
         child: Row(
           children: [
@@ -434,7 +464,7 @@ class _DashboardContentState extends State<_DashboardContent> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                   Text(doc.title,
+                  Text(doc.title,
                       style: const TextStyle(fontWeight: FontWeight.bold)),
                   Text(
                     '${doc.uploadedBy.isNotEmpty ? doc.uploadedBy : 'Admin'} • ${doc.uploadDate.day}/${doc.uploadDate.month}',
@@ -443,7 +473,8 @@ class _DashboardContentState extends State<_DashboardContent> {
                 ],
               ),
             ),
-            const Icon(Icons.chevron_right, color: AnweshanTheme.onSurfaceVariant),
+            Icon(Icons.chevron_right,
+                color: Theme.of(context).colorScheme.onSurfaceVariant),
           ],
         ),
       ),
@@ -506,14 +537,15 @@ class _DashboardContentState extends State<_DashboardContent> {
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Icon(Icons.description_outlined,
-              size: 56, color: AnweshanTheme.primaryDeep.withValues(alpha: 0.3)),
+              size: 56,
+              color: AnweshanTheme.primaryDeep.withValues(alpha: 0.3)),
           const SizedBox(height: 12),
-          const Text(
+          Text(
             'No documents found.',
             style: TextStyle(
               fontWeight: FontWeight.w600,
               fontSize: 16,
-              color: AnweshanTheme.onSurfaceVariant,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
             ),
           ),
           const SizedBox(height: 4),
@@ -521,7 +553,8 @@ class _DashboardContentState extends State<_DashboardContent> {
             'Upload one using the + button!',
             style: TextStyle(
               fontSize: 13,
-              color: AnweshanTheme.onSurfaceVariant.withValues(alpha: 0.7),
+              color: Theme.of(context).colorScheme.onSurfaceVariant
+.withValues(alpha: 0.7),
             ),
           ),
         ],
@@ -542,8 +575,8 @@ class _DashboardContentState extends State<_DashboardContent> {
         }
         final folders = snapshot.data ?? [];
         if (folders.isEmpty) {
-          return const Text('No folders available.',
-              style: TextStyle(color: AnweshanTheme.onSurfaceVariant));
+          return Text('No folders available.',
+              style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant));
         }
         return SizedBox(
           height: 110,
@@ -565,7 +598,7 @@ class _DashboardContentState extends State<_DashboardContent> {
                     ),
                   );
                   if (result == true && mounted) {
-                    _refreshData();
+                    refreshData();
                   }
                 },
                 child: Container(
@@ -651,10 +684,13 @@ class _SearchScreenState extends State<SearchScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
-        title: const Text('Search', style: TextStyle(color: AnweshanTheme.primaryDeep, fontWeight: FontWeight.bold)),
-        backgroundColor: Colors.white,
+        title: Text('Search',
+            style: TextStyle(
+                color: Theme.of(context).colorScheme.onSurface,
+                fontWeight: FontWeight.bold)),
+        backgroundColor: Colors.transparent,
         elevation: 0,
         centerTitle: true,
       ),
@@ -664,8 +700,9 @@ class _SearchScreenState extends State<SearchScreen> {
             padding: const EdgeInsets.all(24.0),
             child: Container(
               decoration: BoxDecoration(
-                color: const Color(0xFFEDEEEF),
+                color: Theme.of(context).colorScheme.surface,
                 borderRadius: BorderRadius.circular(AnweshanTheme.pillRadius),
+                border: Border.all(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.1)),
               ),
               padding: const EdgeInsets.symmetric(horizontal: 20),
               child: TextField(
@@ -673,7 +710,8 @@ class _SearchScreenState extends State<SearchScreen> {
                 onChanged: _onSearch,
                 autofocus: true,
                 decoration: InputDecoration(
-                  icon: const Icon(Icons.search, color: AnweshanTheme.onSurfaceVariant),
+                  icon: Icon(Icons.search,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant),
                   hintText: 'Search by title...',
                   border: InputBorder.none,
                   suffixIcon: _searchController.text.isNotEmpty
@@ -707,11 +745,14 @@ class _SearchScreenState extends State<SearchScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.search, size: 80, color: AnweshanTheme.primaryDeep.withValues(alpha: 0.1)),
+            Icon(Icons.search,
+                size: 80,
+                color: AnweshanTheme.primaryDeep.withValues(alpha: 0.1)),
             const SizedBox(height: 16),
-            const Text(
+            Text(
               'Enter a title to search',
-              style: TextStyle(color: AnweshanTheme.onSurfaceVariant, fontSize: 16),
+              style: TextStyle(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant, fontSize: 16),
             ),
           ],
         ),
@@ -723,11 +764,14 @@ class _SearchScreenState extends State<SearchScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.search_off, size: 80, color: AnweshanTheme.primaryDeep.withValues(alpha: 0.1)),
+            Icon(Icons.search_off,
+                size: 80,
+                color: AnweshanTheme.primaryDeep.withValues(alpha: 0.1)),
             const SizedBox(height: 16),
-            const Text(
+            Text(
               'No documents matched your search',
-              style: TextStyle(color: AnweshanTheme.onSurfaceVariant, fontSize: 16),
+              style: TextStyle(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant, fontSize: 16),
             ),
           ],
         ),
@@ -761,9 +805,13 @@ class _SearchScreenState extends State<SearchScreen> {
         margin: const EdgeInsets.only(bottom: 12),
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: Theme.of(context).colorScheme.surface,
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: Colors.black.withValues(alpha: 0.05)),
+          border: Border.all(
+              color: Theme.of(context)
+                  .colorScheme
+                  .onSurface
+                  .withValues(alpha: 0.05)),
         ),
         child: Row(
           children: [
@@ -774,14 +822,16 @@ class _SearchScreenState extends State<SearchScreen> {
                 color: AnweshanTheme.secondaryGold.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: const Icon(Icons.description, color: AnweshanTheme.accentGoldDim),
+              child: const Icon(Icons.description,
+                  color: AnweshanTheme.accentGoldDim),
             ),
             const SizedBox(width: 16),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(doc.title, style: const TextStyle(fontWeight: FontWeight.bold)),
+                  Text(doc.title,
+                      style: const TextStyle(fontWeight: FontWeight.bold)),
                   Text(
                     '${doc.uploadedBy.isNotEmpty ? doc.uploadedBy : 'Admin'} • ${doc.uploadDate.day}/${doc.uploadDate.month}',
                     style: Theme.of(context).textTheme.labelLarge,
@@ -789,7 +839,8 @@ class _SearchScreenState extends State<SearchScreen> {
                 ],
               ),
             ),
-            const Icon(Icons.chevron_right, color: AnweshanTheme.onSurfaceVariant),
+            Icon(Icons.chevron_right,
+                color: Theme.of(context).colorScheme.onSurfaceVariant),
           ],
         ),
       ),

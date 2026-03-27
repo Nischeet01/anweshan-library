@@ -8,6 +8,7 @@ import 'screens/upload_screen.dart';
 import 'screens/settings_screen.dart';
 import 'screens/signup_screen.dart';
 import 'services/auth_service.dart';
+import 'services/theme_provider.dart';
 import 'package:provider/provider.dart';
 
 void main() async {
@@ -26,14 +27,19 @@ class AnweshanApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ChangeNotifierProvider(
-      create: (context) => AuthService(),
-      child: Consumer<AuthService>(
-        builder: (context, authService, _) {
+    return MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (context) => AuthService()),
+        ChangeNotifierProvider(create: (context) => ThemeProvider()),
+      ],
+      child: Consumer2<AuthService, ThemeProvider>(
+        builder: (context, authService, themeProvider, _) {
           return MaterialApp(
             title: 'Anweshan Document Library',
             debugShowCheckedModeBanner: false,
             theme: AnweshanTheme.lightTheme,
+            darkTheme: AnweshanTheme.darkTheme,
+            themeMode: themeProvider.themeMode,
             // Use a StreamBuilder to listen to auth state changes for the initial screen
             home: StreamBuilder<AuthState>(
               stream: authService.authStateChanges,
@@ -43,7 +49,7 @@ class AnweshanApp extends StatelessWidget {
                     body: Center(child: CircularProgressIndicator()),
                   );
                 }
-                
+
                 final session = snapshot.data?.session;
                 if (session != null) {
                   return const DashboardScreen();
